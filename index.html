@@ -2,23 +2,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Dispatch Calendar</title>
 <style>
-html, body {
-  min-height: 1200px;   /* change to 1300px if you want more height */
-  height: 100%;
-  margin: 0;
-  overflow: auto;
-}
-
-body{
-  font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;
-  margin: 0;            /* IMPORTANT: was 18px */
-  color:#111;
-}
-
-/* This replaces the old body margin */
-.pageWrap{
-  padding: 18px;
-}
+body{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:18px;color:#111;}
 .small{color:#555;font-size:13px;line-height:1.35;}
 h2{margin:0 0 6px 0;}
 .toolbar{display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin:12px 0 14px 0;}
@@ -126,8 +110,17 @@ button.reset:hover{background:#f6f8ff;}
   .kpiSide{order:-1}
 }
 
+
+.edit{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-top:8px}
+.edgrp{display:flex;flex-direction:column;gap:4px}
+.edlbl{font-size:11px;color:#666;font-weight:900}
+.edsel{border:1px solid #ddd;border-radius:10px;padding:7px 9px;background:#fff;min-width:180px;height:36px}
+.edactions{display:flex;gap:8px;align-items:center}
+.edbtn{border:1px solid #ddd;border-radius:10px;padding:7px 10px;background:#fff;cursor:pointer;height:36px;font-weight:900}
+.edbtn:hover{background:#f6f8ff;border-color:#b6c6ff}
+.edbtn.secondary{opacity:.8}
+
 </style></head><body>
-   <div class="pageWrap">
 <h2>Dispatch Calendar</h2>
 <p class="small">
 Office: <b>4741 Boulevard des Laurentides #204, Laval, Quebec H7K 2Z6</b><br/>
@@ -302,7 +295,7 @@ function buildDrawer(){
   `;
   return d;
 }
-function openDrawer(drawer, title, items){
+function openDrawer(drawer, title, items, iso){
   drawer.classList.add('active');
   drawer.querySelector('#drawerTitle').textContent=title;
   const list=drawer.querySelector('#drawerList');
@@ -326,8 +319,55 @@ function openDrawer(drawer, title, items){
     line1.appendChild(el('span',{class:'small'},it.wo||''));
     meta.appendChild(line1);
     meta.appendChild(el('div',{class:'dest'},it.destination||''));
+
+    // --- Tech re-assign (local override) ---
+    const controls = document.createElement('div');
+    controls.className='edit';
+
+    const k = jobKey(it, iso);
+    const current = techOverrides[k] || it.tech;
+
+    const grp = document.createElement('div');
+    grp.className='edgrp';
+    const lbl = document.createElement('div');
+    lbl.className='edlbl';
+    lbl.textContent='Reassign tech';
+    const techSel = document.createElement('select');
+    techSel.className='edsel';
+    ['Adil','Abdel','Chad','UNASSIGNED'].forEach(t=>{
+      const opt=document.createElement('option');
+      opt.value=t; opt.textContent=t;
+      if(current===t) opt.selected=true;
+      techSel.appendChild(opt);
+    });
+    grp.appendChild(lbl);
+    grp.appendChild(techSel);
+
+    const actions = document.createElement('div');
+    actions.className='edactions';
+    const applyBtn = document.createElement('button');
+    applyBtn.type='button';
+    applyBtn.className='edbtn';
+    applyBtn.textContent='Apply';
+    const resetBtn = document.createElement('button');
+    resetBtn.type='button';
+    resetBtn.className='edbtn secondary';
+    resetBtn.textContent='Reset';
+
+    applyBtn.onclick = ()=>{ setTechOverride(k, techSel.value); rerenderActive(); try{ const refreshed = itemsForDate(iso); openDrawer(drawer, `Jobs for ${iso} (${refreshed.length})`, refreshed, iso); }catch(e){} };
+
+    resetBtn.onclick = ()=>{ clearTechOverride(k); rerenderActive(); try{ const refreshed = itemsForDate(iso); openDrawer(drawer, `Jobs for ${iso} (${refreshed.length})`, refreshed, iso); }catch(e){} };
+
+    actions.appendChild(applyBtn);
+    actions.appendChild(resetBtn);
+
+    controls.appendChild(grp);
+    controls.appendChild(actions);
+
     const a=el('a',{href:it.url,target:'_blank'},'Open Map');
+
     row.appendChild(meta);
+    row.appendChild(controls);
     row.appendChild(a);
     list.appendChild(row);
   }
@@ -410,7 +450,7 @@ function makePanel(mid, m){
             ev.preventDefault();
             clearSelected(panel);
             a.classList.add('selected');
-            openDrawer(drawer, `Jobs for ${iso} (${items.length})`, items);
+            openDrawer(drawer, `Jobs for ${iso} (${items.length})`, items, iso);
             drawer.scrollIntoView({behavior:'smooth', block:'start'});
           }
         });
@@ -487,7 +527,7 @@ function makePanel(mid, m){
   return panel;
 }
 
-function activate(mid){
+function activate(mid){ rebuildMonthsFromTechOverrides();
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('tab-'+mid).classList.add('active');
@@ -495,7 +535,7 @@ function activate(mid){
 
   renderKpis();
 }
-function rerenderActive(){ const active=document.querySelector('.panel.active'); if(active && active._rerender) active._rerender(); renderKpis(); }
+function rerenderActive(){ rebuildMonthsFromTechOverrides(); const active=document.querySelector('.panel.active'); if(active && active._rerender) active._rerender(); renderKpis(); }
 
 
 // ---------------- KPIs + Google My Maps export (active month, filtered) ----------------
@@ -632,6 +672,72 @@ function renderKpis(){
 }
 // --------------------------------------------------------------------------
 
+
+// ---------------- Tech overrides (local-first) ----------------
+const techOverridesKey = 'dispatch_tech_overrides_v1';
+let techOverrides = {};
+try{ techOverrides = JSON.parse(localStorage.getItem(techOverridesKey) || '{}') || {}; }catch(e){ techOverrides = {}; }
+
+function saveTechOverrides(){
+  try{ localStorage.setItem(techOverridesKey, JSON.stringify(techOverrides)); }catch(e){}
+}
+function jobKey(it, iso){
+  const wo = (it.wo||'').trim();
+  if(wo) return 'WO:' + wo;
+  const site = (it.site||'').trim();
+  const plage = (it.plage||'').trim();
+  return 'SITE:' + site + '|' + iso + '|' + plage;
+}
+function setTechOverride(key, tech){
+  techOverrides[key] = tech;
+  saveTechOverrides();
+}
+function clearTechOverride(key){
+  delete techOverrides[key];
+  saveTechOverrides();
+}
+
+// Keep an immutable base copy of months so we can rebuild after overrides
+if(!payload._baseMonths){
+  payload._baseMonths = JSON.parse(JSON.stringify(payload.months));
+}
+
+function rebuildMonthsFromTechOverrides(){
+  // IMPORTANT: mutate in-place so existing panel closures keep working
+  const freshAll = JSON.parse(JSON.stringify(payload._baseMonths));
+  // ensure all months exist
+  for(const mid of Object.keys(freshAll)){
+    if(!payload.months[mid]) payload.months[mid] = {};
+    const target = payload.months[mid];
+    const fresh = freshAll[mid];
+    // replace properties of target (keep reference)
+    for(const k of Object.keys(target)){ delete target[k]; }
+    for(const k of Object.keys(fresh)){ target[k] = fresh[k]; }
+  }
+  // remove any months not in base
+  for(const mid of Object.keys(payload.months)){
+    if(!freshAll[mid]) delete payload.months[mid];
+  }
+
+  // Apply tech overrides in-place per day
+  for(const mid of Object.keys(payload.months)){
+    const m = payload.months[mid];
+    for(const iso of Object.keys(m.date_index||{})){
+      const arr = m.date_index[iso] || [];
+      for(let i=0;i<arr.length;i++){
+        const it = arr[i];
+        const k = jobKey(it, iso);
+        const ovTech = techOverrides[k];
+        if(ovTech){
+          it.tech = ovTech;
+          it.unassigned = (ovTech === 'UNASSIGNED');
+        }
+      }
+    }
+  }
+}
+// ------------------------------------------------------------
+
 // Build UI
 populateFilters();
 
@@ -642,6 +748,7 @@ for(const mid of Object.keys(payload.months)){
   tabs.appendChild(tab);
   content.appendChild(makePanel(mid,m));
 }
+rebuildMonthsFromTechOverrides();
 activate(Object.keys(payload.months)[0]);
 renderKpis();
 regionFilter.onchange=rerenderActive;
@@ -652,4 +759,4 @@ resetBtn.onclick=()=>{
   problemsOnly.checked=false;
   rerenderActive();
 };
-</script></div></body></html>
+</script></body></html>
