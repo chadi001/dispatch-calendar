@@ -2023,6 +2023,7 @@ function rebuildMonthsFromOverrides(){
 // ---------------------------------------------------------------------------
 
 // Build UI
+rebuildMonthsFromOverrides();   // ✅ must be before building UI
 populateFilters();
 
 for(const mid of Object.keys(payload.months)){
@@ -2032,7 +2033,10 @@ for(const mid of Object.keys(payload.months)){
   tabs.appendChild(tab);
   content.appendChild(makePanel(mid,m));
 }
-rebuildMonthsFromOverrides();
+
+activate(Object.keys(payload.months)[0]);
+renderKpis();
+
 activate(Object.keys(payload.months)[0]);
 renderKpis();
 regionFilter.onchange=rerenderActive;
