@@ -179,20 +179,22 @@ button.reset:hover{background:#f6f8ff;}
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
 <script>
-  const SUPABASE_URL = "https://mycgdissxzsizoywcwps.supabase.co";
-  const SUPABASE_ANON_KEY =
+  window.SUPABASE_URL = "https://mycgdissxzsizoywcwps.supabase.co";
+  window.SUPABASE_ANON_KEY =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15Y2dkaXNzeHpzaXpveXdjd3BzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxNzkyNDEsImV4cCI6MjA4NTc1NTI0MX0.1-3qDwNwFeqlHjn-jCACOtV5U2yhgEsQ1yUM-m2TKZg";
 
-  const supabase = window.supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY
+  // Create ONCE even if this block appears twice
+  window.sb = window.sb || window.supabase.createClient(
+    window.SUPABASE_URL,
+    window.SUPABASE_ANON_KEY
   );
 </script>
 
 
+
 <script>
 async function dbLoadJobs() {
-  const { data, error } = await supabase
+  const { data, error } = await window.sb
     .from("jobs")
     .select("*")
     .eq("cancelled", false);
@@ -206,7 +208,7 @@ async function dbLoadJobs() {
 }
 
 async function dbUpsertJob(job) {
-  const { data, error } = await supabase
+  const { data, error } = await window.sb
     .from("jobs")
     .upsert(job)
     .select()
@@ -221,7 +223,7 @@ async function dbUpsertJob(job) {
 }
 
 async function dbUpdateJob(id, updates) {
-  const { error } = await supabase
+  const { error } = await window.sb
     .from("jobs")
     .update(updates)
     .eq("id", id);
