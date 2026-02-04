@@ -1879,12 +1879,20 @@ function saveOverrides(){
   try{ localStorage.setItem(manualLocksKey,   JSON.stringify(manualLocks)); }catch(e){}
 }
 function jobKey(it, iso){
-  const wo = (it.wo||'').trim();
+  // 1) Best: stable DB UUID (Supabase)
+  const id = (it.id || '').toString().trim();
+  if(id) return 'ID:' + id;
+
+  // 2) WO = order_number (same thing, different field names)
+  const wo = (it.wo || it.order_number || '').toString().trim();
   if(wo) return 'WO:' + wo;
-  const site = (it.site||'').trim();
-  const plage = (it.plage||'').trim();
+
+  // 3) Fallback if no WO and no id (least stable)
+  const site = (it.site || it.prov_site || it.site_name || '').toString().trim();
+  const plage = (it.plage || it.slot || '').toString().trim();
   return 'SITE:' + site + '|' + iso + '|' + plage;
 }
+
 function setTechOverride(key, tech){ techOverrides[key] = tech; saveOverrides(); }
 function clearTechOverride(key){ delete techOverrides[key]; saveOverrides(); }
 function setPlageOverride(key, plage){ plageOverrides[key] = plage; saveOverrides(); }
