@@ -194,17 +194,17 @@ button.reset:hover{background:#f6f8ff;}
 
 <script>
 async function dbLoadJobs() {
+  // Load ALL jobs (including cancelled). UI decides what to show.
   const { data, error } = await window.sb
     .from("jobs")
-    .select("*")
-    .eq("cancelled", false);
+    .select("*");
 
   if (error) {
     console.error("DB load error:", error);
     alert("Error loading jobs from database");
     return [];
   }
-  return data;
+  return data || [];
 }
 
 async function dbUpsertJob(job) {
@@ -1378,12 +1378,79 @@ document.getElementById('btnExportAllJson')?.addEventListener('click', exportAll
 document.getElementById('btnImportAllJson')?.addEventListener('click', ()=>pickFile('.json,application/json', importAllJson));
 
 // ---------------- Manual jobs (localStorage) ----------------
+// ---------------- Manual jobs (DB-first, local fallback cache) ----------------
 const manualJobsKey = 'dispatch_manual_jobs_v1';
+let manualJobsCache = [];
+
 function loadManualJobs(){
-  try{ return JSON.parse(localStorage.getItem(manualJobsKey)||'[]') || []; }catch(e){ return []; }
+  return Array.isArray(manualJobsCache) ? manualJobsCache : [];
 }
+
+// Keep a local backup so the page still works if DB is unreachable
 function saveManualJobs(list){
-  try{ localStorage.setItem(manualJobsKey, JSON.stringify(list||[])); }catch(e){}
+  manualJobsCache = Array.isArray(list) ? list : [];
+  try{ localStorage.setItem(manualJobsKey, JSON.stringify(manualJobsCache)); }catch(e){}
+}
+
+function dbRowToManualRec(row){
+  const iso = (row.job_date || row.iso || '').toString().slice(0,10);
+  const slot = (row.slot || row.plage || 'AM').toString().toUpperCase();
+  const tech = (row.tech_name || row.tech || 'UNASSIGNED').toString();
+  const site = (row.prov_site || row.site || row.site_name || '').toString();
+  const wo   = (row.order_number || row.wo || '').toString();
+
+  const city = (row.city || row.region || '').toString();
+  const addr = (row.address || '').toString();
+  const prov = (row.province || '').toString();
+  const dest = [addr, city, prov].filter(Boolean).join(', ');
+
+  const job = {
+    id: row.id,
+    plage: slot,
+    tech,
+    region: city,
+    site,
+    wo,
+    client: (row.client || 'UNK').toString(),
+    province: prov,
+    label: `${slot} | ${tech} | ${site} | ${wo}`,
+    url: 'Map',
+    destination: dest,
+    unassigned: (tech === 'UNASSIGNED'),
+    cancelled: !!row.cancelled,
+    manual_lock: !!row.manual_lock,
+    raw: {
+      city,
+      address: addr,
+      postal: row.postal || '',
+      prov_site: site,
+      order_number: wo,
+      job_desc: row.job_desc || '',
+    }
+  };
+
+  return { iso, job };
+}
+
+async function refreshManualJobsFromDB(){
+  if(!window.sb){
+    // no DB client -> load from local backup
+    try{ manualJobsCache = JSON.parse(localStorage.getItem(manualJobsKey)||'[]') || []; }catch(e){ manualJobsCache=[]; }
+    return;
+  }
+
+  const { data, error } = await window.sb.from('jobs').select('*');
+  if(error){
+    console.error('DB load jobs error:', error);
+    try{ manualJobsCache = JSON.parse(localStorage.getItem(manualJobsKey)||'[]') || []; }catch(e){ manualJobsCache=[]; }
+    return;
+  }
+
+  const recs = (data||[])
+    .map(dbRowToManualRec)
+    .filter(r => r.iso && r.iso.length===10);
+
+  saveManualJobs(recs);
 }
 function ensureMonthExists(monthId){
   // monthId is expected to be "1".."12" (single-year calendar model).
@@ -1416,17 +1483,28 @@ function addJobToPayload(iso, job){
 }
 
 function applyManualJobsToPayload(){
-  // Migrate any legacy manual jobs (stored separately) into BASE months once.
-  const list = loadManualJobs();
-  if(!list || !list.length) return;
-  for(const rec of list){
-    if(!rec || !rec.iso || !rec.job) continue;
-    const iso = rec.iso;
-    const job = rec.job;
-    addJobToPayload(iso, job);
+  // Inject manual jobs (from DB/local cache) into BASE months so they persist across refresh.
+  const recs = loadManualJobs();
+  if(!Array.isArray(recs) || !recs.length) return;
+
+  for(const rec of recs){
+    const iso = (rec && rec.iso) ? String(rec.iso).slice(0,10) : '';
+    const job = rec && rec.job ? rec.job : null;
+    if(!iso || !job) continue;
+
+    // Dedupe:
+    // - if it has DB id, don't add twice
+    // - else if it has WO, don't add twice (best effort)
+    const mid = String(parseInt(iso.slice(5,7),10));
+    const m = payload._baseMonths && payload._baseMonths[mid];
+    if(m && m.date_index && m.date_index[iso]){
+      const arr = m.date_index[iso] || [];
+      const already = arr.some(x => (job.id && x.id===job.id) || (job.wo && x.wo===job.wo));
+      if(already) continue;
+    }
+
+    addJobToBaseMonths(job, iso);
   }
-  // After migration, clear legacy store to prevent duplicates on next load.
-  try{ localStorage.removeItem(manualJobsKey); }catch(e){}
 }
 
 
@@ -1558,77 +1636,63 @@ const tabs=document.getElementById('tabs');
   }
 }
 
-function addJobFromModal(){
-  const dateEl=document.getElementById('aj_date');
-  const iso = (dateEl && dateEl.value) ? dateEl.value.trim() : '';
-  if(!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)){
-    alert('Please select a valid Date Scheduled.');
+async function addJobFromModal(){
+  const iso = (document.getElementById('aj_date')?.value || '').trim();
+  if(!iso){ alert('Pick a date'); return; }
+
+  const city = (document.getElementById('aj_city')?.value || '').trim();
+  const address = (document.getElementById('aj_address')?.value || '').trim();
+  const site = (document.getElementById('aj_site')?.value || '').trim();
+  const wo = (document.getElementById('aj_wo')?.value || '').trim();
+  const tech = (document.getElementById('aj_tech')?.value || '').trim();
+  const slot = (document.getElementById('aj_plage')?.value || 'AM').trim().toUpperCase();
+
+  if(!city || !address){
+    alert('City and Address are required');
     return;
   }
-  const client=(document.getElementById('aj_client')?.value||'').trim();
-  const site=(document.getElementById('aj_site')?.value||'').trim();
-  const wo=(document.getElementById('aj_wo')?.value||'').trim();
-  const province=(document.getElementById('aj_province')?.value||'').trim();
-  const city=(document.getElementById('aj_city')?.value||'').trim();
-  const address=(document.getElementById('aj_address')?.value||'').trim();
-  const techSel=(document.getElementById('aj_tech')?.value||'AUTO').trim();
-  const plageSel=(document.getElementById('aj_plage')?.value||'AUTO').trim();
 
-  let tech = techSel;
-  let plage = plageSel;
+  const destination = `${address}, ${city}, QC`;
+  const map = buildGoogleMapsLink(destination);
 
-  if(techSel==='AUTO' || plageSel==='AUTO'){
-    const cand = { region: (city||'').trim() || (((provSite||'').trim().split('-')[0])||''), raw:{city:(city||'').trim(), address:(address||'').trim()}, destination: jobDestinationFromFields(address, city, province) };
-    const auto = autoAssignTechAndPlage(iso, cand);
-    if(techSel==='AUTO') tech = auto.tech;
-    if(plageSel==='AUTO') plage = auto.plage;
-  }
-
-
-  // Enforce capacity constraints on manual assignment (max 2 jobs/tech/day; 1 per slot)
-  try{
-    if(tech && tech !== 'UNASSIGNED'){
-      const arr = getDaySchedule(iso);
-      const p = (plage==='PM')?'PM':'AM';
-      if(techCount(arr, tech) >= 2 || slotTaken(arr, tech, p)){
-        tech = 'UNASSIGNED';
-        alert('Conflit: capacité dépassée (max 2 interventions/jour par tech et 1 par plage). Intervention ajoutée en UNASSIGNED.');
-      }
-    }
-  }catch(e){}
-
-  // Build destination and map link
-  const dest = jobDestinationFromFields(address, city, province);
-  const map = buildDirectionsUrl(dest);
-
-  const job = {
-    client: client || '',
-    site: site || '',
-    wo: wo || '',
-    province: province || '',
-    region: city || '',
-    destination: dest || '',
-    plage: (plage==='PM'?'PM':'AM'),
-    tech: tech || 'UNASSIGNED',
-    map_link: map,
-    raw: { city }
+  // 1) Save into DB (source of truth for cross-device)
+  const dbRow = {
+    job_date: iso,
+    slot,
+    tech_name: tech || 'UNASSIGNED',
+    client: 'GOCO',
+    province: 'QC',
+    city,
+    address,
+    prov_site: site,
+    order_number: wo,
+    site_name: site,
+    job_desc: '',
+    cancelled: false,
+    manual_lock: false
   };
 
-  // persist manual jobs
+  const saved = await dbUpsertJob(dbRow);
+  if(!saved) return;
+
+  // 2) Convert saved row to the calendar item + persist in local cache
+  const rec = dbRowToManualRec(saved);
+  rec.job.url = map;
+  rec.job.destination = destination;
+
   const list = loadManualJobs();
-  list.push({ iso, job });
+  list.push(rec);
   saveManualJobs(list);
 
-  // update payload and UI
-  addJobToPayload(iso, job);
-  const monthId = String(parseInt(iso.slice(5,7),10));
+  // 3) Update payload and UI
+  addJobToPayload(rec.iso, rec.job);
+  const monthId = String(parseInt(rec.iso.slice(5,7),10));
   ensureMonthUI(monthId);
-  activate(monthId); // jump to the right month so user sees it immediately
+  activate(monthId);
   rerenderActive();
 
-  const keep=document.getElementById('aj_keepOpen')?.checked;
+  const keep = document.getElementById('aj_keepOpen')?.checked;
   if(keep){
-    // keep date
     ['aj_site','aj_wo','aj_city','aj_address'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   }else{
     closeAddJob();
@@ -1879,7 +1943,64 @@ function saveOverrides(){
   try{ localStorage.setItem(dateOverridesKey,  JSON.stringify(dateOverrides)); }catch(e){}
   try{ localStorage.setItem(cancelOverridesKey, JSON.stringify(cancelOverrides)); }catch(e){}
   try{ localStorage.setItem(manualLocksKey,   JSON.stringify(manualLocks)); }catch(e){}
+  // Also persist to DB (debounced) so it syncs across devices
+  try{ if(!window.__dispatch_bootstrap) persistOverridesSoon(); }catch(e){}
 }
+
+
+// ---------------- Overrides sync (DB) ----------------
+const overridesTable = 'dispatch_overrides';
+const overridesKey   = 'default';
+
+function debounce(fn, wait){
+  let t=null;
+  return function(...args){
+    clearTimeout(t);
+    t=setTimeout(()=>fn.apply(this,args), wait);
+  };
+}
+
+async function dbSaveOverrides(){
+  if(!window.sb) return;
+
+  const payloadRow = {
+    key: overridesKey,
+    tech_overrides: techOverrides,
+    plage_overrides: plageOverrides,
+    date_overrides: dateOverrides,
+    cancel_overrides: cancelOverrides,
+    manual_locks: manualLocks,
+    updated_at: new Date().toISOString()
+  };
+
+  const { error } = await window.sb
+    .from(overridesTable)
+    .upsert(payloadRow, { onConflict: 'key' });
+
+  if(error){
+    console.error('DB save overrides error:', error);
+  }
+}
+
+async function dbLoadOverrides(){
+  if(!window.sb) return null;
+
+  const { data, error } = await window.sb
+    .from(overridesTable)
+    .select('*')
+    .eq('key', overridesKey)
+    .maybeSingle();
+
+  if(error){
+    console.error('DB load overrides error:', error);
+    return null;
+  }
+  return data || null;
+}
+
+// Debounced saver so we don't spam the DB on every click
+const persistOverridesSoon = debounce(dbSaveOverrides, 350);
+
 
 function jobKey(it, iso){
   // 1) Best: stable DB UUID (Supabase)
@@ -2022,33 +2143,62 @@ function rebuildMonthsFromOverrides(){
 
 // ---------------------------------------------------------------------------
 
-// Build UI
-rebuildMonthsFromOverrides();   // ✅ must be before building UI
-populateFilters();
+// Build UI (async bootstrap: load overrides + DB jobs, then render)
+async function initApp(){
+  try{ window.__dispatch_bootstrap = true; }catch(e){}
 
-for(const mid of Object.keys(payload.months)){
-  const m=payload.months[mid];
-  const tab=el('button',{class:'tab',id:'tab-'+mid},m.name);
-  tab.onclick=()=>activate(mid);
-  tabs.appendChild(tab);
-  content.appendChild(makePanel(mid,m));
+  // 1) Load overrides from DB (if available)
+  const dbOv = await dbLoadOverrides();
+  if(dbOv){
+    techOverrides  = dbOv.tech_overrides  || {};
+    plageOverrides = dbOv.plage_overrides || {};
+    dateOverrides  = dbOv.date_overrides  || {};
+    cancelOverrides = dbOv.cancel_overrides || {};
+    manualLocks    = dbOv.manual_locks    || {};
+    // save locally (but bootstrap flag prevents re-saving to DB)
+    saveOverrides();
+  }
+
+  // 2) Load manual jobs from DB and inject into base months
+  await refreshManualJobsFromDB();
+  applyManualJobsToPayload();
+
+  // 3) Apply overrides (date + tech + AM/PM + cancel) and then build UI
+  rebuildMonthsFromOverrides();
+
+  populateFilters();
+
+  // Clear existing UI (important if init runs more than once)
+  tabs.innerHTML = '';
+  content.innerHTML = '';
+
+  for(const mid of Object.keys(payload.months)){
+    const m = payload.months[mid];
+    const tab = el('button', {class:'tab', id:'tab-'+mid}, m.name);
+    tab.onclick = ()=>activate(mid);
+    tabs.appendChild(tab);
+    content.appendChild(makePanel(mid, m));
+  }
+
+  activate(Object.keys(payload.months)[0]);
+  renderKpis();
+
+  regionFilter.onchange = rerenderActive;
+  problemsOnly.onchange = rerenderActive;
+  showCancelled.onchange = rerenderActive;
+  resetBtn.onclick = ()=>{
+    document.querySelectorAll("#techChecks input[type=checkbox]").forEach(cb=>cb.checked=false);
+    regionFilter.value='ALL';
+    problemsOnly.checked=false;
+    if(showCancelled) showCancelled.checked=false;
+    rerenderActive();
+  };
+
+  try{ window.__dispatch_bootstrap = false; }catch(e){}
 }
 
-activate(Object.keys(payload.months)[0]);
-renderKpis();
-
-activate(Object.keys(payload.months)[0]);
-renderKpis();
-regionFilter.onchange=rerenderActive;
-problemsOnly.onchange=rerenderActive;
-showCancelled.onchange=rerenderActive;
-resetBtn.onclick=()=>{
-  document.querySelectorAll("#techChecks input[type=checkbox]").forEach(cb=>cb.checked=false);
-  regionFilter.value='ALL';
-  problemsOnly.checked=false;
-  if(showCancelled) showCancelled.checked=false;
-  rerenderActive();
-};
+// Start
+initApp();
 </script>
 <!-- Order search / edit modal -->
 <div id="orderSearchModal" class="modal" style="display:none" aria-hidden="true">
