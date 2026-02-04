@@ -188,7 +188,51 @@ button.reset:hover{background:#f6f8ff;}
     SUPABASE_ANON_KEY
   );
 </script>
-  
+
+
+<script>
+async function dbLoadJobs() {
+  const { data, error } = await supabase
+    .from("jobs")
+    .select("*")
+    .eq("cancelled", false);
+
+  if (error) {
+    console.error("DB load error:", error);
+    alert("Error loading jobs from database");
+    return [];
+  }
+  return data;
+}
+
+async function dbUpsertJob(job) {
+  const { data, error } = await supabase
+    .from("jobs")
+    .upsert(job)
+    .select()
+    .single();
+
+  if (error) {
+    console.error("DB save error:", error);
+    alert("Error saving job");
+    return null;
+  }
+  return data;
+}
+
+async function dbUpdateJob(id, updates) {
+  const { error } = await supabase
+    .from("jobs")
+    .update(updates)
+    .eq("id", id);
+
+  if (error) {
+    console.error("DB update error:", error);
+    alert("Error updating job");
+  }
+}
+</script>
+ 
  </head><body>
 <h2>Dispatch Calendar</h2>
 <p class="small">
