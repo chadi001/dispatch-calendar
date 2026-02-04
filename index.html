@@ -1878,7 +1878,7 @@ function saveOverrides(){
   try{ localStorage.setItem(cancelOverridesKey, JSON.stringify(cancelOverrides)); }catch(e){}
   try{ localStorage.setItem(manualLocksKey,   JSON.stringify(manualLocks)); }catch(e){}
 }
-<script>
+
 function jobKey(it, iso){
   // 1) Best key: DB id if it exists
   const idVal = (it && it.id != null) ? String(it.id).trim() : "";
@@ -1900,7 +1900,7 @@ function jobKey(it, iso){
 
   return "SITE:" + siteVal + "|" + iso + "|" + plageVal;
 }
-</script>
+
 
 
 
