@@ -2,6 +2,21 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Dispatch Calendar (v1.9)</title>
 <style>
+
+/* Modal (generic) */
+.modal{position:fixed;inset:0;z-index:9999}
+.modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.35)}
+.modal-dialog{position:relative;max-width:920px;margin:6vh auto;background:#fff;border-radius:16px;
+  box-shadow:0 20px 60px rgba(0,0,0,.25);padding:16px}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.modal-title{font-weight:700}
+.modal-body{max-height:70vh;overflow:auto}
+.resultsTable{width:100%;border-collapse:collapse}
+.resultsTable th,.resultsTable td{padding:8px;border-bottom:1px solid #eee;text-align:left;font-size:13px}
+.resultsTable th{font-size:12px;color:#555;text-transform:uppercase;letter-spacing:.5px}
+.edbtn{padding:6px 10px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;cursor:pointer}
+.edbtn.secondary{background:#f9fafb}
+
 body{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:18px;color:#111;}
 .small{color:#555;font-size:13px;line-height:1.35;}
 h2{margin:0 0 6px 0;}
@@ -16,6 +31,8 @@ button.reset:hover{background:#f6f8ff;}
 .legend{display:flex;gap:12px;flex-wrap:wrap;margin:10px 0 12px 0;align-items:center;}
 .tag{display:inline-flex;align-items:center;gap:6px;border:1px solid #eee;border-radius:999px;padding:3px 8px;background:#fff;}
 .dot{width:10px;height:10px;border-radius:999px;display:inline-block;}
+.lockicon{font-size:12px;opacity:.85;margin-left:6px;line-height:1;}
+
 .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 14px 0;}
 .tab{border:1px solid #ddd;border-radius:10px;padding:8px 10px;cursor:pointer;background:#fff;}
 .tab.active{background:#f3f6ff;border-color:#b6c6ff;}
@@ -138,7 +155,41 @@ button.reset:hover{background:#f6f8ff;}
 .req{color:#c00; font-weight:700;}
 @media (max-width:680px){ .grid2{grid-template-columns:1fr;} .span2{grid-column:auto;} .modal-card{margin:2vh auto;} }
 
-</style></head><body>
+
+/* client badge (weekly drawer) */
+.clientTag{display:inline-block;padding:2px 6px;border-radius:10px;font-size:11px;font-weight:700;letter-spacing:.3px;margin-right:6px;vertical-align:middle}
+.clientTag.goco{background:#e8f3ff;color:#0b4a8b}
+.clientTag.mcn{background:#fff0f0;color:#8b0b0b}
+.clientTag.unk{background:#f2f2f2;color:#444}
+.item.cancelled{opacity:.55}
+.item.cancelled .dest{text-decoration:line-through}
+.cancelPill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;background:#111;color:#fff;margin-left:6px}
+.resultsTable{width:100%;border-collapse:collapse;margin-top:10px}
+.resultsTable th,.resultsTable td{border-bottom:1px solid #eee;padding:8px 6px;font-size:13px;text-align:left;vertical-align:top}
+.resultsTable th{font-size:12px;color:#555;text-transform:uppercase;letter-spacing:.5px}
+
+
+/* Quick order search */
+.order-search-quick{display:inline-flex;align-items:center;gap:8px;margin-left:8px}
+#orderSearchQuick{height:36px;min-width:220px;border:1px solid #e5e7eb;border-radius:10px;padding:0 12px;font-size:14px}
+#orderSearchQuick:focus{outline:none;border-color:#93c5fd;box-shadow:0 0 0 3px rgba(147,197,253,.35)}
+
+</style> 
+<!-- Supabase client -->
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
+<script>
+  const SUPABASE_URL = "https://mycgdissxzsizoywcwps.supabase.co";
+  const SUPABASE_ANON_KEY =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15Y2dkaXNzeHpzaXpveXdjd3BzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxNzkyNDEsImV4cCI6MjA4NTc1NTI0MX0.1-3qDwNwFeqlHjn-jCACOtV5U2yhgEsQ1yUM-m2TKZg";
+
+  const supabase = window.supabase.createClient(
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY
+  );
+</script>
+  
+ </head><body>
 <h2>Dispatch Calendar</h2>
 <p class="small">
 Office: <b>4741 Boulevard des Laurentides #204, Laval, Quebec H7K 2Z6</b><br/>
@@ -166,6 +217,15 @@ Tech priority: <b>Adil</b> → <b>Abdel</b>. Capacity: 1 AM + 1 PM per tech/day.
     <input type="checkbox" id="problemsOnly"/>
     <label for="problemsOnly" style="font-size:13px;margin:0;">Problems only (UNASSIGNED)</label>
   </div>
+  <div class="chk">
+    <input type="checkbox" id="showCancelled"/>
+    <label for="showCancelled" style="font-size:13px;margin:0;">Show cancelled</label>
+  </div>
+
+  <div class="order-search-quick top">
+    <input id="orderSearchQuick" type="text" placeholder="Search Order #…" autocomplete="off"/>
+    <button class="reset" id="btnOrderSearchGo" type="button">Search</button>
+  </div>
   <button class="reset" id="resetBtn">Reset</button>
 </div>
 
@@ -176,7 +236,7 @@ Tech priority: <b>Adil</b> → <b>Abdel</b>. Capacity: 1 AM + 1 PM per tech/day.
 <div class="kpiWrap" id="kpiWrap">
   <div class="kpiHead">
     <div class="kpiTitle">Dispatch KPIs (active month, filtered)</div>
-    <div class="kpiSub" id="kpiSub">—</div>
+    <div class="kpiSub" id="kpiSub">— <span id="yearTotal" style="float:right;font-weight:600;"></span></div>
   </div>
   <div class="kpiGrid">
     <div class="kpiCard"><div class="kpiLbl">Total jobs</div><div class="kpiVal" id="kpiTotal">0</div></div>
@@ -196,6 +256,7 @@ Tech priority: <b>Adil</b> → <b>Abdel</b>. Capacity: 1 AM + 1 PM per tech/day.
         <button class="reset" id="btnExportJobsCsv" type="button">Export jobs CSV</button>
     <button class="reset" id="btnImportJobsCsv" type="button">Import jobs CSV</button>
     <input id="fileImportJobsCsv" type="file" accept=".csv,text/csv" style="display:none"/>
+    
     <button class="primary" id="btnAddJob" type="button">Add job</button>
     <button class="reset" id="btnExportAllJson" type="button">Export ALL JSON (jobs + overrides)</button>
     <button class="reset" id="btnImportAllJson" type="button">Import ALL JSON (jobs + overrides)</button>
@@ -225,7 +286,7 @@ Tech priority: <b>Adil</b> → <b>Abdel</b>. Capacity: 1 AM + 1 PM per tech/day.
     <div class="modal-header">
       <div>
         <div id="addJobTitle" class="modal-title">Add intervention</div>
-        <div class="modal-subtitle">Leave <b>Tech</b> and <b>Start time</b> on <i>Auto</i> to auto-fill (Adil → Abdel; AM → PM).</div>
+        <div class="modal-subtitle">Leave <b>Tech</b> and <b>Start time</b> on <i>Auto</i> to auto-fill (Adil first; max 2/day per tech).</div>
       </div>
       <button class="reset" id="btnCloseAddJob" type="button">✕</button>
     </div>
@@ -331,6 +392,7 @@ const tabs=document.getElementById('tabs');
 const content=document.getElementById('content');
 const regionFilter=document.getElementById('regionFilter');
 const problemsOnly=document.getElementById('problemsOnly');
+const showCancelled=document.getElementById('showCancelled');
 const resetBtn=document.getElementById('resetBtn');
 
 function el(tag, attrs={}, text=null){
@@ -388,9 +450,10 @@ function populateFilters(){
 
 function selectedTechs(){ return Array.from(document.querySelectorAll("#techChecks input[type=checkbox]:checked")).map(x=>x.value); }
 function currentFilters(){
-  return {techs:selectedTechs(), region:regionFilter.value, problemsOnly:problemsOnly.checked};
+  return {techs:selectedTechs(), region:regionFilter.value, problemsOnly:problemsOnly.checked, showCancelled: (document.getElementById('showCancelled')||{checked:false}).checked};
 }
 function matchFilters(it, filters){
+  if(!filters.showCancelled && it._cancelled) return false;
   if(filters.techs.length>0 && !filters.techs.includes(it.tech)) return false;
   if(filters.region!=="ALL" && it.region!==filters.region) return false;
   if(filters.problemsOnly && !it.unassigned) return false;
@@ -400,6 +463,10 @@ function plageSort(p){ return p==="AM"?0:(p==="PM"?1:2); }
 
 function itemsForDate(m, iso, filters){
   const all=(m.date_index && m.date_index[iso]) ? m.date_index[iso] : [];
+  for(const it of all){
+    const k = jobKey(it, iso);
+    it._cancelled = !!cancelOverrides[k];
+  }
   const arr=all.filter(it=>matchFilters(it,filters));
   arr.sort((a,b)=>plageSort(a.plage)-plageSort(b.plage) || (a.tech||"").localeCompare(b.tech||""));
   return arr;
@@ -439,7 +506,9 @@ function openDrawer(drawer, title, items, iso){
     return;
   }
   for(const it of items){
-    const row=el('div',{class:'item'+(it.unassigned?' unassigned':'')});
+    const kPre = jobKey(it, iso);
+    const isCancelled = !!cancelOverrides[kPre];
+    const row=el('div',{class:'item'+(it.unassigned?' unassigned':'')+(isCancelled?' cancelled':'')});
     const meta=el('div',{class:'meta'});
     const line1=el('div',{class:'line1'});
     const pill=el('span',{class:'pill '+(it.plage==='PM'?'pm':'am')});
@@ -447,10 +516,18 @@ function openDrawer(drawer, title, items, iso){
     pill.appendChild(el('span',{},it.plage));
     pill.appendChild(dot);
     pill.appendChild(el('span',{},it.tech));
+    if(isManualLocked(kPre)) pill.appendChild(el('span',{class:'lockicon',title:'Manual lock'},'🔒'));
     line1.appendChild(pill);
+    // client badge (weekly view only)
+    const c = (it.client||'').trim().toUpperCase();
+    const ct = document.createElement('span');
+    ct.className = 'clientTag ' + (c==='GOCO'?'goco':(c==='MCN'?'mcn':'unk'));
+    ct.textContent = c || '—';
+    line1.appendChild(ct);
     line1.appendChild(el('span',{class:'small'},it.region||''));
     line1.appendChild(el('span',{},it.site||''));
     line1.appendChild(el('span',{class:'small'},it.wo||''));
+    if(isCancelled){ line1.appendChild(el('span',{class:'cancelPill'},'CANCELLED')); }
     meta.appendChild(line1);
     meta.appendChild(el('div',{class:'dest'},it.destination||''));
 
@@ -477,29 +554,7 @@ function openDrawer(drawer, title, items, iso){
     });
     grp.appendChild(lbl);
     grp.appendChild(techSel);
-
-    const actions = document.createElement('div');
-    actions.className='edactions';
-    const applyBtn = document.createElement('button');
-    applyBtn.type='button';
-    applyBtn.className='edbtn';
-    applyBtn.textContent='Apply';
-    const resetBtn = document.createElement('button');
-    resetBtn.type='button';
-    resetBtn.className='edbtn secondary';
-    resetBtn.textContent='Reset';
-    applyBtn.onclick = ()=>{
-      setTechOverride(k, techSel.value);
-      rerenderActive();
-      try{ const refreshed = itemsForDate(iso); openDrawer(drawer, `Jobs for ${iso} (${refreshed.length})`, refreshed, iso); }catch(e){}
-    };
-    resetBtn.onclick = ()=>{
-      clearTechOverride(k);
-      rerenderActive();
-      try{ const refreshed = itemsForDate(iso); openDrawer(drawer, `Jobs for ${iso} (${refreshed.length})`, refreshed, iso); }catch(e){}
-    };
-    actions.appendChild(applyBtn);
-    actions.appendChild(resetBtn);
+    controls.appendChild(grp);
 
     // Slot group
     const grp2 = document.createElement('div');
@@ -517,29 +572,31 @@ function openDrawer(drawer, title, items, iso){
     });
     grp2.appendChild(lbl2);
     grp2.appendChild(plageSel);
+    controls.appendChild(grp2);
 
-    const actions2 = document.createElement('div');
-    actions2.className='edactions';
-    const applyBtn2 = document.createElement('button');
-    applyBtn2.type='button';
-    applyBtn2.className='edbtn';
-    applyBtn2.textContent='Apply';
-    const resetBtn2 = document.createElement('button');
-    resetBtn2.type='button';
-    resetBtn2.className='edbtn secondary';
-    resetBtn2.textContent='Reset';
-    applyBtn2.onclick = ()=>{
-      setPlageOverride(k, plageSel.value);
+    // Status group (kept immediate)
+    const grpS = document.createElement('div');
+    grpS.className='edgrp';
+    const lblS = document.createElement('div');
+    lblS.className='edlbl';
+    lblS.textContent='Status';
+    const actionsS = document.createElement('div');
+    actionsS.className='edactions';
+    const btnCancel = document.createElement('button');
+    btnCancel.type='button';
+    btnCancel.className='edbtn ' + (isCancelled ? 'secondary' : '');
+    btnCancel.textContent = isCancelled ? 'Restore' : 'Cancel';
+    btnCancel.onclick = ()=>{
+      setManualLock(k);
+      if(isCancelled){ delete cancelOverrides[k]; } else { cancelOverrides[k]=true; }
+      saveOverrides();
       rerenderActive();
       try{ const refreshed = itemsForDate(iso); openDrawer(drawer, `Jobs for ${iso} (${refreshed.length})`, refreshed, iso); }catch(e){}
     };
-    resetBtn2.onclick = ()=>{
-      clearPlageOverride(k);
-      rerenderActive();
-      try{ const refreshed = itemsForDate(iso); openDrawer(drawer, `Jobs for ${iso} (${refreshed.length})`, refreshed, iso); }catch(e){}
-    };
-    actions2.appendChild(applyBtn2);
-    actions2.appendChild(resetBtn2);
+    actionsS.appendChild(btnCancel);
+    grpS.appendChild(lblS);
+    grpS.appendChild(actionsS);
+    controls.appendChild(grpS);
 
     // Date group
     const grp3 = document.createElement('div');
@@ -557,44 +614,81 @@ function openDrawer(drawer, title, items, iso){
 
     grp3.appendChild(lbl3);
     grp3.appendChild(dateInp);
+    controls.appendChild(grp3);
 
-    const actions3 = document.createElement('div');
-    actions3.className='edactions';
-    const applyBtn3 = document.createElement('button');
-    applyBtn3.type='button';
-    applyBtn3.className='edbtn';
-    applyBtn3.textContent='Apply';
-    const resetBtn3 = document.createElement('button');
-    resetBtn3.type='button';
-    resetBtn3.className='edbtn secondary';
-    resetBtn3.textContent='Reset';
-    applyBtn3.onclick = ()=>{
-      if(dateInp.value){
-        setDateOverride(k, dateInp.value);
-        rerenderActive();
-        try{
-          const refreshed = itemsForDate(iso); 
-          openDrawer(drawer, `Jobs for ${iso} (${refreshed.length})`, refreshed, iso);
-        }catch(e){}
-      }
-    };
-    resetBtn3.onclick = ()=>{
-      clearDateOverride(k);
+    // Consolidated Apply/Reset (Tech + AM/PM + Date)
+    const grpA = document.createElement('div');
+    grpA.className='edgrp';
+    const lblA = document.createElement('div');
+    lblA.className='edlbl';
+    lblA.textContent='Changes';
+    const actionsA = document.createElement('div');
+    actionsA.className='edactions';
+
+    const applyAll = document.createElement('button');
+    applyAll.type='button';
+    applyAll.className='edbtn';
+    applyAll.textContent='Apply changes';
+
+    const resetAll = document.createElement('button');
+    resetAll.type='button';
+    resetAll.className='edbtn secondary';
+    resetAll.textContent='Reset changes';
+
+    applyAll.onclick = ()=>{
+      setManualLock(k);
+
+      // Tech
+      if(techSel.value === it.tech){ clearTechOverride(k); } else { setTechOverride(k, techSel.value); }
+      // AM/PM
+      if(plageSel.value === it.plage){ clearPlageOverride(k); } else { setPlageOverride(k, plageSel.value); }
+      // Date
+      if(dateInp.value && dateInp.value !== iso){ setDateOverride(k, dateInp.value); } else { clearDateOverride(k); }
+
       rerenderActive();
+
+      // Validate constraints: max 2 jobs per tech/day and max 1 per slot (AM/PM) per tech/day.
       try{
-        const refreshed = itemsForDate(iso); 
+        const targetIso = (dateOverrides[k] || iso);
+        const targetTech = (techOverrides[k] || it.tech);
+        const targetPlage = (plageOverrides[k] || it.plage);
+        if(targetTech && targetTech !== 'UNASSIGNED'){
+          const dayArr = getDaySchedule(targetIso);
+          const cnt = techCount(dayArr, targetTech);
+          const slotCnt = dayArr.filter(x => (x.tech||'')===targetTech && (x.plage||'')===targetPlage).length;
+          if(cnt > 2 || slotCnt > 1){
+            // Mark as UNASSIGNED (problem) and alert
+            setTechOverride(k, 'UNASSIGNED');
+            alert(`Conflit: ${targetTech} dépasse la capacité (max 2/jour et 1 par plage). Intervention mise UNASSIGNED.`);
+            rerenderActive();
+          }
+        }
+      }catch(e){}
+      try{
+        // if the job moved away from the currently open day, refresh the drawer to current day
+        const refreshed = itemsForDate(iso);
         openDrawer(drawer, `Jobs for ${iso} (${refreshed.length})`, refreshed, iso);
       }catch(e){}
     };
-    actions3.appendChild(applyBtn3);
-    actions3.appendChild(resetBtn3);
 
-    controls.appendChild(grp);
-    controls.appendChild(actions);
-    controls.appendChild(grp2);
-    controls.appendChild(actions2);
-    controls.appendChild(grp3);
-    controls.appendChild(actions3);
+    resetAll.onclick = ()=>{
+      clearManualLock(k);
+      clearTechOverride(k);
+      clearPlageOverride(k);
+      clearDateOverride(k);
+      rerenderActive();
+      try{
+        const refreshed = itemsForDate(iso);
+        openDrawer(drawer, `Jobs for ${iso} (${refreshed.length})`, refreshed, iso);
+      }catch(e){}
+    };
+
+    actionsA.appendChild(applyAll);
+    actionsA.appendChild(resetAll);
+    grpA.appendChild(lblA);
+    grpA.appendChild(actionsA);
+    controls.appendChild(grpA);
+
 
     const a=el('a',{href:buildMapsLink(it.destination||it.url||''),target:'_blank'},'Open Map');
 
@@ -654,20 +748,28 @@ function makePanel(mid, m){
         a.appendChild(el('div',{class:'daynum'},String(d)));
         if(cnt>0) a.appendChild(el('div',{class:'count'},String(cnt)));
 
-        // small load per tech (filtered)
-        const byTech={ 'Adil':0, 'Abdel':0 };
+        // small load per tech (filtered) — show all techs (up to 5) in priority order
+        const byTech = {};
+        for(const t of TECHS){ byTech[t] = 0; }
         for(const it of items){
-          if(byTech[it.tech]!==undefined) byTech[it.tech]+=1;
+          if(byTech[it.tech] !== undefined) byTech[it.tech] += 1;
+          else byTech[it.tech] = 1;
         }
-        const loadWrap=el('div',{class:'load'});
-        for(const t of ['Adil','Abdel']){
-          if(byTech[t]>0){
-            const s=el('span',{});
-            const dot=el('span',{class:'dot'}); dot.style.background=techColors[t];
-            s.appendChild(dot);
-            s.appendChild(el('b',{},String(byTech[t])));
-            loadWrap.appendChild(s);
-          }
+        const loadWrap = el('div', {class:'load'});
+        const shown = [];
+        for(const t of TECHS){
+          if(byTech[t] > 0){ shown.push(t); }
+        }
+        const MAX_TECH_BADGES = 5;
+        for(const t of shown.slice(0, MAX_TECH_BADGES)){
+          const s = el('span', {});
+          const dot = el('span', {class:'dot'}); dot.style.background = techColors[t] || '#777';
+          s.appendChild(dot);
+          s.appendChild(el('b', {}, String(byTech[t])));
+          loadWrap.appendChild(s);
+        }
+        if(shown.length > MAX_TECH_BADGES){
+          loadWrap.appendChild(el('span', {class:'more', title:'More techs'}, `+${shown.length - MAX_TECH_BADGES}`));
         }
         if(loadWrap.children.length>0) a.appendChild(loadWrap);
 
@@ -788,6 +890,13 @@ function collectMonthItems(monthId, filters){
   out.sort((a,b)=>plageSort(a.plage)-plageSort(b.plage) || (a.tech||'').localeCompare(b.tech||''));
   return out;
 }
+function collectAllItems(filters){
+  const out=[];
+  for(const mid of Object.keys(payload.months||{})){
+    out.push(...collectMonthItems(mid, filters));
+  }
+  return out;
+}
 function calcCapacityByTech(items){
   const dates=new Set(items.map(x=>x.iso));
   const days=dates.size || 0;
@@ -801,6 +910,13 @@ function renderKpis(){
   const monthName = m ? m.name : '';
   const sub=document.getElementById('kpiSub');
   if(sub) sub.textContent = monthName ? `${monthName} • ${items.length} job(s) shown` : '—';
+  // Year-to-date total (all interventions, excluding cancelled)
+  const yEl=document.getElementById('yearTotal');
+  if(yEl){
+    const allFilters={techs:[], region:"ALL", problemsOnly:false, showCancelled:false};
+    const allItems=collectAllItems(allFilters);
+    yEl.textContent = `Year total: ${allItems.length}`;
+  }
 
   const counts={}; TECHS.forEach(t=>counts[t]=0);
   const regions={};
@@ -991,30 +1107,51 @@ function slotTaken(arr, tech, plage){
 function techCount(arr, tech){
   return arr.filter(x => (x.tech||'')===tech).length;
 }
-function autoAssignTech(iso, plage){
+function autoAssignTech(iso, plage, cand){
   const arr=getDaySchedule(iso);
   const p = plage || 'AM';
-  // Fill Adil then Abdel (for now)
-  for(const tech of ["Adil","Abdel"]){
+  const norm=(s)=>String(s||'').trim().toLowerCase();
+  const candReg = norm(cand && (cand.region || (cand.raw && cand.raw.city)));
+
+  const PRIORITY = ["Adil","Abdel","Chadi","Tech A","Tech B"];
+
+  // Prefer Adil for same-region pair (proxy for <=80km), if the slot is available
+  if(candReg){
+    const adilJobs = arr.filter(x => (x.tech||'')==='Adil');
+    if(adilJobs.length===1){
+      const r0 = norm(adilJobs[0].region || (adilJobs[0].raw && adilJobs[0].raw.city));
+      if(r0 && r0===candReg){
+        if(techCount(arr,'Adil') < 2 && !slotTaken(arr,'Adil', p)) return 'Adil';
+      }
+    }
+  }
+
+  // Default: fill by priority (max 2/day and max 1 per slot)
+  for(const tech of PRIORITY){
     if(techCount(arr, tech) >= 2) continue;
     if(!slotTaken(arr, tech, p)) return tech;
   }
-  // If requested plage is full for those, try the other slot
+
+  // If requested plage is full for all, try the other slot
   const other = (p==='AM')?'PM':'AM';
-  for(const tech of ["Adil","Abdel"]){
+  for(const tech of PRIORITY){
     if(techCount(arr, tech) >= 2) continue;
     if(!slotTaken(arr, tech, other)) return tech;
   }
+
   return 'UNASSIGNED';
 }
 function autoAssignTechAndPlage(iso){
   const arr=getDaySchedule(iso);
-  // Fill Adil then Abdel (optimize today)
-  for(const tech of ["Adil","Abdel"]){
+  // Default: Adil gets AM then PM first
+  const PRIORITY = ["Adil","Abdel","Chadi","Tech A","Tech B"];
+
+  for(const tech of PRIORITY){
     if(techCount(arr, tech) >= 2) continue;
     if(!slotTaken(arr, tech, 'AM')) return {tech, plage:'AM'};
     if(!slotTaken(arr, tech, 'PM')) return {tech, plage:'PM'};
   }
+
   return {tech:'UNASSIGNED', plage:'AM'};
 }
 function addJobToBaseMonths(job, iso){
@@ -1084,9 +1221,25 @@ function importJobsCsv(file){
       const iso=toIsoDate(row[iDate]);
       if(!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) continue;
 
+      // Extract location fields first (needed for region-aware auto assignment)
+      const city=(row[iCity]||'').trim();
+      const addr=(row[iAddr]||'').trim();
+      const province=(row[iProv]||'').trim();
+      const site=(row[iSite]||'').trim();
+      const wo=(row[iWO]||'').trim();
+      const client=(row[iClient]||'').trim();
+      const destination = [addr, city, province].filter(Boolean).join(', ');
+      const region = city || (site||'').split('-')[0] || 'Unknown';
+
+      const rawLink = (row[iLink]||'').trim();
+      const url = (rawLink && /^https?:\/\//i.test(rawLink)) ? rawLink : buildMapsLink(destination);
+
       const rawTime = (row[iTime]||'').toString().trim();
       let tech=normalizeTechName(row[iTech]);
       let plage='';
+
+      const cand = { region, raw:{city, address: addr}, destination };
+
       if(!rawTime){
         // Auto-pick AM then PM when Start Time is empty.
         if(tech && TECHS.includes(tech) && tech!=='UNASSIGNED'){
@@ -1096,31 +1249,21 @@ function importJobsCsv(file){
             else if(!slotTaken(arr, tech, 'PM')) plage='PM';
           }
         }
-        if(!plage){
-          const ap = autoAssignTechAndPlage(iso);
+        if(!plage || !tech || !TECHS.includes(tech)){
+          const ap = autoAssignTechAndPlage(iso, cand);
           tech = ap.tech;
           plage = ap.plage;
         }
       }else{
         plage=normalizePlage(rawTime);
-        if(!tech || !TECHS.includes(tech)) tech = autoAssignTech(iso, plage);
+        if(!tech || !TECHS.includes(tech)) tech = autoAssignTech(iso, plage, cand);
       }
       if(!plage) plage='AM';
-
-      const city=(row[iCity]||'').trim();
-      const addr=(row[iAddr]||'').trim();
-      const province=(row[iProv]||'').trim();
-      const site=(row[iSite]||'').trim();
-      const wo=(row[iWO]||'').trim();
-      const client=(row[iClient]||'').trim();
-      const destination = [addr, city, province].filter(Boolean).join(', ');
-      const rawLink = (row[iLink]||'').trim();
-      const url = (rawLink && /^https?:\/\//i.test(rawLink)) ? rawLink : buildMapsLink(destination);
 
       const job={
         plage,
         tech,
-        region: city || (site||'').split('-')[0] || 'Unknown',
+        region,
         site,
         wo,
         client,
@@ -1148,11 +1291,12 @@ function buildMapsLink(destination){
   return `${base}&origin=${o}&destination=${d}&travelmode=driving`;
 }
 function exportAllJson(){
-  // includes base months + overrides
+  // includes base months + overrides + cancel + manualLocks + manualJobs
   const pack={
     year: payload.year,
     baseMonths: payload._baseMonths || {},
-    techOverrides, plageOverrides, dateOverrides
+    techOverrides, plageOverrides, dateOverrides, cancelOverrides, manualLocks,
+    manualJobs: loadManualJobs()
   };
   downloadText(`dispatch_ALL_${payload.year}.json`, JSON.stringify(pack,null,2), 'application/json;charset=utf-8');
 }
@@ -1168,6 +1312,9 @@ function importAllJson(file){
       techOverrides = pack.techOverrides || {};
       plageOverrides = pack.plageOverrides || {};
       dateOverrides = pack.dateOverrides || {};
+      cancelOverrides = pack.cancelOverrides || {};
+      manualLocks = pack.manualLocks || {};
+      if(Array.isArray(pack.manualJobs)) saveManualJobs(pack.manualJobs);
       saveOverrides();
       rerenderActive();
       alert('Import JSON terminé.');
@@ -1261,8 +1408,26 @@ function firstFreePlage(byTech, tech){
   if(s.PM<1) return 'PM';
   return null;
 }
-function autoAssignTechAndPlage(iso){
-  // Only optimize for Adil then Abdel, per request.
+function autoAssignTechAndPlage(iso, cand){
+  // Optimize for Adil then Abdel.
+  // Additional rule: if Adil already has 1 job in the SAME region for that day (proxy for <=80km),
+  // then assign Adil the other slot (AM/PM) to keep both jobs together.
+  const arr=getDaySchedule(iso);
+  const norm=(s)=>String(s||'').trim().toLowerCase();
+  const candReg = norm(cand && (cand.region || (cand.raw && cand.raw.city)));
+  if(candReg){
+    const adilJobs = arr.filter(x => (x.tech||'')==='Adil');
+    if(adilJobs.length===1){
+      const r0 = norm(adilJobs[0].region || (adilJobs[0].raw && adilJobs[0].raw.city));
+      if(r0 && r0===candReg){
+        const other = ((adilJobs[0].plage||'AM')==='AM') ? 'PM' : 'AM';
+        if(techCount(arr,'Adil') < 2 && !slotTaken(arr,'Adil', other)){
+          return {tech:'Adil', plage:other};
+        }
+      }
+    }
+  }
+
   rebuildMonthsFromOverrides();
   const byTech = countSlotsFor(iso);
   const p1 = firstFreePlage(byTech, 'Adil');
@@ -1367,10 +1532,24 @@ function addJobFromModal(){
   let plage = plageSel;
 
   if(techSel==='AUTO' || plageSel==='AUTO'){
-    const auto = autoAssignTechAndPlage(iso);
+    const cand = { region: (city||'').trim() || (((provSite||'').trim().split('-')[0])||''), raw:{city:(city||'').trim(), address:(address||'').trim()}, destination: jobDestinationFromFields(address, city, province) };
+    const auto = autoAssignTechAndPlage(iso, cand);
     if(techSel==='AUTO') tech = auto.tech;
     if(plageSel==='AUTO') plage = auto.plage;
   }
+
+
+  // Enforce capacity constraints on manual assignment (max 2 jobs/tech/day; 1 per slot)
+  try{
+    if(tech && tech !== 'UNASSIGNED'){
+      const arr = getDaySchedule(iso);
+      const p = (plage==='PM')?'PM':'AM';
+      if(techCount(arr, tech) >= 2 || slotTaken(arr, tech, p)){
+        tech = 'UNASSIGNED';
+        alert('Conflit: capacité dépassée (max 2 interventions/jour par tech et 1 par plage). Intervention ajoutée en UNASSIGNED.');
+      }
+    }
+  }catch(e){}
 
   // Build destination and map link
   const dest = jobDestinationFromFields(address, city, province);
@@ -1419,6 +1598,202 @@ document.getElementById('addJobBackdrop')?.addEventListener('click', closeAddJob
 document.getElementById('btnAddJobConfirm')?.addEventListener('click', addJobFromModal);
 
 
+
+// Order search / edit modal
+function openOrderSearch(){
+  const m=document.getElementById('orderSearchModal');
+  if(!m) return;
+  m.style.display='block';
+  m.setAttribute('aria-hidden','false');
+  const inp=document.getElementById('orderSearchInput');
+  if(inp){ inp.value=''; inp.focus(); }
+  const res=document.getElementById('orderSearchResults'); if(res) res.innerHTML='';
+}
+function closeOrderSearch(){
+  const m=document.getElementById('orderSearchModal');
+  if(!m) return;
+  m.style.display='none';
+  m.setAttribute('aria-hidden','true');
+}
+function renderOrderResults(list){
+  const wrap=document.getElementById('orderSearchResults');
+  if(!wrap) return;
+  if(!list.length){
+    wrap.innerHTML = '<div class="small">No results.</div>';
+    return;
+  }
+  const table=document.createElement('table');
+  table.className='resultsTable';
+  table.innerHTML = `<thead><tr>
+    <th>Date</th><th>Slot</th><th>Tech</th><th>Client</th><th>City</th><th>Site</th><th>Order #</th><th>Actions</th>
+  </tr></thead>`;
+  const tb=document.createElement('tbody');
+  for(const r of list){
+    const tr=document.createElement('tr');
+    const c=(r.it.client||'').toUpperCase();
+    tr.innerHTML = `
+      <td>${r.iso}</td>
+      <td>${(r.it.plage||'')}</td>
+      <td>${(r.it.tech||'')}</td>
+      <td>${c||''}</td>
+      <td>${(r.it.region||'')}</td>
+      <td>${(r.it.site||'')}</td>
+      <td>${((r.it.raw?.order_number ?? r.it.order_number ?? r.it['Order Number'] ?? r.it.orderNumber ?? '')||'')}</td>
+      <td></td>
+    `;
+    const td=tr.querySelector('td:last-child');
+    const go=document.createElement('button');
+    go.className='edbtn';
+    go.type='button';
+    go.textContent='Open day';
+    go.onclick=()=>{
+      closeOrderSearch();
+      // jump to month tab
+      const mid=String(parseInt(r.iso.slice(5,7),10));
+      setActiveMonth(mid);
+      rerenderActive();
+      // open drawer for that day
+      const m = payload.months[mid];
+      const items = itemsForDate(m, r.iso, currentFilters());
+      openDrawer(document.getElementById('drawer'), `Jobs for ${r.iso} (${items.length})`, items, r.iso);
+    };
+    const edit=document.createElement('button');
+    edit.className='edbtn secondary';
+    edit.type='button';
+    edit.textContent='Edit';
+    edit.onclick=()=>{
+      const cur = (r.it.raw?.order_number ?? r.it.order_number ?? r.it['Order Number'] ?? r.it.orderNumber ?? '');
+      const nw = prompt('New Order Number (leave blank to clear):', String(cur||''));
+      if(nw===null) return;
+      updateOrderNumber(r, String(nw||'').trim());
+    };
+    td.appendChild(go);
+    td.appendChild(document.createTextNode(' '));
+    td.appendChild(edit);
+    tb.appendChild(tr);
+  }
+  table.appendChild(tb);
+  wrap.innerHTML='';
+  wrap.appendChild(table);
+}
+function runOrderSearch(){
+  rebuildMonthsFromOverrides();
+  const qRaw=(document.getElementById('orderSearchInput')?.value||'').trim();
+  const wrap=document.getElementById('orderSearchResults');
+  if(wrap) wrap.innerHTML = '<div class="small">Searching…</div>';
+  if(!qRaw){ renderOrderResults([]); return; }
+
+  const qDigits = qRaw.replace(/\D/g,'');
+  const qLower = qRaw.toLowerCase();
+
+  const results=[];
+  for(const mid of Object.keys(payload.months||{})){
+    const m=payload.months[mid];
+    for(const iso of Object.keys(m.date_index||{})){
+      for(const it of (m.date_index[iso]||[])){
+        const ord = ((it.raw && it.raw.order_number) ?? it.order_number ?? it['Order Number'] ?? it.orderNumber ?? '').toString();
+        const ordDigits = ord.replace(/\D/g,'');
+        const ordLower = ord.toLowerCase();
+        const hit = (qDigits && ordDigits.includes(qDigits)) || (!qDigits && ordLower.includes(qLower));
+        if(hit){
+          results.push({mid, iso, it});
+        }
+      }
+    }
+  }
+  results.sort((a,b)=>a.iso.localeCompare(b.iso) || plageSort(a.it.plage)-plageSort(b.it.plage));
+  renderOrderResults(results);
+}
+function migrateOverrideKey(oldKey, newKey){
+  if(oldKey===newKey) return;
+  if(techOverrides[oldKey]!==undefined){ techOverrides[newKey]=techOverrides[oldKey]; delete techOverrides[oldKey]; }
+  if(plageOverrides[oldKey]!==undefined){ plageOverrides[newKey]=plageOverrides[oldKey]; delete plageOverrides[oldKey]; }
+  if(dateOverrides[oldKey]!==undefined){ dateOverrides[newKey]=dateOverrides[oldKey]; delete dateOverrides[oldKey]; }
+  if(cancelOverrides[oldKey]!==undefined){ cancelOverrides[newKey]=cancelOverrides[oldKey]; delete cancelOverrides[oldKey]; }
+  saveOverrides();
+}
+function updateOrderNumber(ref, newOrderNumber){
+  const iso=ref.iso;
+  const midBase=String(parseInt(iso.slice(5,7),10));
+  const base=payload._baseMonths?.[midBase];
+  if(!base || !base.date_index || !base.date_index[iso]){
+    alert('Cannot find the job in base data. Try Export ALL JSON and re-import, then try again.');
+    return;
+  }
+  let found=null;
+  for(const it of base.date_index[iso]){
+    if(it===ref.it){ found=it; break; }
+  }
+  if(!found){
+    found = base.date_index[iso].find(x=>(x.site||'')===(ref.it.site||'') && (x.plage||'')===(ref.it.plage||'') && (x.tech||'')===(ref.it.tech||'') && (x.destination||'')===(ref.it.destination||''));
+  }
+  if(!found){ alert('Job not found in base.'); return; }
+  found.order_number = newOrderNumber;
+  if(!found.raw) found.raw = {};
+  found.raw.order_number = newOrderNumber;
+  try{ localStorage.setItem('dispatch_base_months_v1', JSON.stringify(payload._baseMonths)); }catch(e){}
+  rebuildMonthsFromOverrides();
+  rerenderActive();
+  runOrderSearch();
+}
+
+document.getElementById('btnOrderSearch')?.addEventListener('click', openOrderSearch);
+
+// Quick order search (top right)
+document.getElementById('btnOrderSearchGo')?.addEventListener('click', ()=>{
+  const q=(document.getElementById('orderSearchQuick')?.value||'').trim();
+  openOrderSearch();
+  const inp=document.getElementById('orderSearchInput');
+  if(inp){ inp.value=q; }
+  runOrderSearch();
+});
+document.getElementById('orderSearchQuick')?.addEventListener('keydown', (e)=>{
+  if(e.key==='Enter'){
+    e.preventDefault();
+    document.getElementById('btnOrderSearchGo')?.click();
+  }
+});
+
+// Order search modal wiring
+document.getElementById('btnCloseOrderSearch')?.addEventListener('click', closeOrderSearch);
+document.getElementById('orderSearchBackdrop')?.addEventListener('click', closeOrderSearch);
+document.getElementById('btnRunOrderSearch')?.addEventListener('click', runOrderSearch);
+document.getElementById('btnClearOrderSearch')?.addEventListener('click', ()=>{
+  const inp=document.getElementById('orderSearchInput'); if(inp) inp.value='';
+  renderOrderResults([]);
+});
+document.getElementById('orderSearchInput')?.addEventListener('keydown', (e)=>{
+  if(e.key==='Enter'){ e.preventDefault(); runOrderSearch(); }
+  if(e.key==='Escape'){ e.preventDefault(); closeOrderSearch(); }
+});
+
+// Modal close handlers
+document.getElementById('btnOrderSearchClose')?.addEventListener('click', closeOrderSearch);
+document.getElementById('btnOrderSearchDo')?.addEventListener('click', runOrderSearch);
+document.getElementById('btnOrderSearchClear')?.addEventListener('click', ()=>{
+  const inp=document.getElementById('orderSearchInput'); if(inp) inp.value='';
+  const res=document.getElementById('orderSearchResults'); if(res) res.innerHTML='';
+  const q=document.getElementById('orderSearchQuick'); if(q) q.value='';
+  inp?.focus();
+});
+document.getElementById('orderSearchInput')?.addEventListener('keydown', (e)=>{
+  if(e.key==='Enter'){ e.preventDefault(); runOrderSearch(); }
+});
+document.getElementById('orderSearchModal')?.addEventListener('click', (e)=>{
+  const t=e.target;
+  if(t && t.getAttribute && t.getAttribute('data-close')==='1'){ closeOrderSearch(); }
+});
+
+document.getElementById('btnCloseOrderSearch')?.addEventListener('click', closeOrderSearch);
+document.getElementById('btnRunOrderSearch')?.addEventListener('click', runOrderSearch);
+document.getElementById('btnClearOrderSearch')?.addEventListener('click', ()=>{
+  const inp=document.getElementById('orderSearchInput'); if(inp){ inp.value=''; inp.focus(); }
+  const res=document.getElementById('orderSearchResults'); if(res) res.innerHTML='';
+});
+document.getElementById('btnClearOrderSearch')?.addEventListener('click', ()=>{ const i=document.getElementById('orderSearchInput'); if(i) i.value=''; renderOrderResults([]); });
+document.getElementById('orderSearchModal')?.addEventListener('click', (ev)=>{ if(ev.target && ev.target.id==='orderSearchModal') closeOrderSearch(); });
+document.getElementById('orderSearchInput')?.addEventListener('keydown', (ev)=>{ if(ev.key==='Enter'){ ev.preventDefault(); runOrderSearch(); } });
+
 // --------------------------------------------------------------------------
 
 
@@ -1428,9 +1803,24 @@ document.getElementById('btnAddJobConfirm')?.addEventListener('click', addJobFro
 const techOverridesKey  = 'dispatch_tech_overrides_v1';
 const plageOverridesKey = 'dispatch_plage_overrides_v1';
 const dateOverridesKey  = 'dispatch_date_overrides_v1';
+const cancelOverridesKey = 'dispatch_cancel_overrides_v1';
 let techOverrides = {};
 let plageOverrides = {};
 let dateOverrides = {};
+let cancelOverrides = {};
+const manualLocksKey = 'dispatch_manual_locks_v1';
+let manualLocks = {};
+try{ manualLocks = JSON.parse(localStorage.getItem(manualLocksKey)||'{}') || {}; }catch(e){ manualLocks = {}; }
+function setManualLock(k){
+  manualLocks[k]=true;
+  try{ localStorage.setItem(manualLocksKey, JSON.stringify(manualLocks)); }catch(e){}
+}
+function clearManualLock(k){
+  delete manualLocks[k];
+  try{ localStorage.setItem(manualLocksKey, JSON.stringify(manualLocks)); }catch(e){}
+}
+function isManualLocked(k){ return !!manualLocks[k]; }
+
 try{ techOverrides  = JSON.parse(localStorage.getItem(techOverridesKey)  || '{}') || {}; }catch(e){ techOverrides = {}; }
 try{ plageOverrides = JSON.parse(localStorage.getItem(plageOverridesKey) || '{}') || {}; }catch(e){ plageOverrides = {}; }
 try{ dateOverrides  = JSON.parse(localStorage.getItem(dateOverridesKey)  || '{}') || {}; }catch(e){ dateOverrides = {}; }
@@ -1439,6 +1829,8 @@ function saveOverrides(){
   try{ localStorage.setItem(techOverridesKey,  JSON.stringify(techOverrides)); }catch(e){}
   try{ localStorage.setItem(plageOverridesKey, JSON.stringify(plageOverrides)); }catch(e){}
   try{ localStorage.setItem(dateOverridesKey,  JSON.stringify(dateOverrides)); }catch(e){}
+  try{ localStorage.setItem(cancelOverridesKey, JSON.stringify(cancelOverrides)); }catch(e){}
+  try{ localStorage.setItem(manualLocksKey,   JSON.stringify(manualLocks)); }catch(e){}
 }
 function jobKey(it, iso){
   const wo = (it.wo||'').trim();
@@ -1579,10 +1971,65 @@ activate(Object.keys(payload.months)[0]);
 renderKpis();
 regionFilter.onchange=rerenderActive;
 problemsOnly.onchange=rerenderActive;
+showCancelled.onchange=rerenderActive;
 resetBtn.onclick=()=>{
   document.querySelectorAll("#techChecks input[type=checkbox]").forEach(cb=>cb.checked=false);
   regionFilter.value='ALL';
   problemsOnly.checked=false;
+  if(showCancelled) showCancelled.checked=false;
   rerenderActive();
 };
-</script></body></html>
+</script>
+<!-- Order search / edit modal -->
+<div id="orderSearchModal" class="modal" style="display:none" aria-hidden="true">
+  <div class="modal-backdrop" id="orderSearchBackdrop"></div>
+  <div class="modal-dialog" role="dialog" aria-modal="true" aria-label="Search Order Number">
+    <div class="modal-header">
+      <div class="modal-title">Search / edit Order Number</div>
+      <button type="button" class="reset" id="btnCloseOrderSearch">Close</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+        <input id="orderSearchInput" type="text" placeholder="Type Order Number (e.g., 506290)" autocomplete="off"
+               style="flex:1;height:36px;border:1px solid #e5e7eb;border-radius:10px;padding:0 12px;font-size:14px"/>
+        <button type="button" class="reset" id="btnRunOrderSearch">Search</button>
+        <button type="button" class="reset" id="btnClearOrderSearch">Clear</button>
+      </div>
+      <div id="orderSearchResults"></div>
+      <div class="small" style="margin-top:10px;color:#6b7280">
+        Tip: You can search by partial digits. Example: 506 → matches 506290.
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script>
+/* Order search modal: late-bind handlers (fix for static hosting where script loads before modal markup) */
+(function(){
+  const $ = (id)=>document.getElementById(id);
+  function attach(){
+    const close = (window.closeOrderSearch ? window.closeOrderSearch : function(){
+      const m=$('orderSearchModal'); if(!m) return;
+      m.style.display='none'; m.setAttribute('aria-hidden','true');
+    });
+    const run = (window.runOrderSearch ? window.runOrderSearch : function(){});
+    $('btnCloseOrderSearch')?.addEventListener('click', close);
+    $('orderSearchBackdrop')?.addEventListener('click', close);
+    $('btnRunOrderSearch')?.addEventListener('click', run);
+    $('btnClearOrderSearch')?.addEventListener('click', ()=>{
+      const inp=$('orderSearchInput'); if(inp) inp.value='';
+      if(window.renderOrderResults) window.renderOrderResults([]);
+      else { const r=$('orderSearchResults'); if(r) r.innerHTML=''; }
+    });
+    $('orderSearchInput')?.addEventListener('keydown', (e)=>{
+      if(e.key==='Enter'){ e.preventDefault(); run(); }
+      if(e.key==='Escape'){ e.preventDefault(); close(); }
+    });
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', attach);
+  else attach();
+})();
+</script>
+
+</body></html>
