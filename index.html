@@ -1881,22 +1881,24 @@ function saveOverrides(){
 function jobKey(it, iso){
   // 1) Best: stable DB UUID (Supabase)
   const id = (it.id || '').toString().trim();
-  if(id) return 'ID:' + id;
+  if (id) return 'ID:' + id;
 
-  // 2) WO = order_number (same thing, different field names; also check raw.order_number)
-  const wo = (
+  // 2) WO == order_number (same thing, different field names)
+  const woVal = (
     it.wo ||
     it.order_number ||
     (it.raw && it.raw.order_number) ||
     ''
   ).toString().trim();
-  if(wo) return 'WO:' + wo;
+
+  if (woVal) return 'WO:' + woVal;
 
   // 3) Fallback if no WO and no id (least stable)
   const site = (it.site || it.prov_site || it.site_name || '').toString().trim();
   const plage = (it.plage || it.slot || '').toString().trim();
   return 'SITE:' + site + '|' + iso + '|' + plage;
 }
+
 
 
 function setTechOverride(key, tech){ techOverrides[key] = tech; saveOverrides(); }
