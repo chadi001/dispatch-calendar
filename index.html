@@ -2,7 +2,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Dispatch Calendar (v1.9)</title>
 <style>
-  
+
 /* Modal (generic) */
 .modal{position:fixed;inset:0;z-index:9999}
 .modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.35)}
@@ -234,6 +234,66 @@ async function dbUpdateJob(id, updates) {
   }
 }
 </script>
+<script>
+// ---------------- DB sync for overrides (shared across devices) ----------------
+// Create table: public.dispatch_overrides (year int primary key, jsonb columns)
+// RLS should be OFF for now while testing (we'll add policies later).
+const OVERRIDE_YEAR = (window.payload && window.payload.year) ? window.payload.year : 2026;
+let __dbBootstrap = false;
+let __saveOvTimer = null;
+
+async function dbLoadOverridePack(){
+  try{
+    const { data, error } = await window.sb
+      .from('dispatch_overrides')
+      .select('year, tech_overrides, plage_overrides, date_overrides, cancel_overrides, manual_locks')
+      .eq('year', OVERRIDE_YEAR)
+      .maybeSingle();
+
+    if(error){
+      console.warn('dbLoadOverridePack error:', error);
+      return null;
+    }
+    return data || null;
+  }catch(e){
+    console.warn('dbLoadOverridePack exception:', e);
+    return null;
+  }
+}
+
+async function dbSaveOverridePack(){
+  try{
+    const pack = {
+      year: OVERRIDE_YEAR,
+      tech_overrides: techOverrides || {},
+      plage_overrides: plageOverrides || {},
+      date_overrides: dateOverrides || {},
+      cancel_overrides: cancelOverrides || {},
+      manual_locks: manualLocks || {}
+    };
+    const { error } = await window.sb
+      .from('dispatch_overrides')
+      .upsert(pack, { onConflict: 'year' });
+
+    if(error){
+      console.warn('dbSaveOverridePack error:', error);
+      return false;
+    }
+    return true;
+  }catch(e){
+    console.warn('dbSaveOverridePack exception:', e);
+    return false;
+  }
+}
+
+// Debounced saver (avoid spamming DB on every click)
+function scheduleSaveOverridesToDB(){
+  if(__dbBootstrap) return; // don't write back while bootstrapping
+  clearTimeout(__saveOvTimer);
+  __saveOvTimer = setTimeout(()=>{ dbSaveOverridePack(); }, 350);
+}
+</script>
+
  
  </head><body>
 <h2>Dispatch Calendar</h2>
@@ -1870,8 +1930,6 @@ function isManualLocked(k){ return !!manualLocks[k]; }
 try{ techOverrides  = JSON.parse(localStorage.getItem(techOverridesKey)  || '{}') || {}; }catch(e){ techOverrides = {}; }
 try{ plageOverrides = JSON.parse(localStorage.getItem(plageOverridesKey) || '{}') || {}; }catch(e){ plageOverrides = {}; }
 try{ dateOverrides  = JSON.parse(localStorage.getItem(dateOverridesKey)  || '{}') || {}; }catch(e){ dateOverrides = {}; }
-try{ cancelOverrides = JSON.parse(localStorage.getItem(cancelOverridesKey) || '{}') || {}; }catch(e){ cancelOverrides = {}; }
-
 
 function saveOverrides(){
   try{ localStorage.setItem(techOverridesKey,  JSON.stringify(techOverrides)); }catch(e){}
@@ -1879,32 +1937,16 @@ function saveOverrides(){
   try{ localStorage.setItem(dateOverridesKey,  JSON.stringify(dateOverrides)); }catch(e){}
   try{ localStorage.setItem(cancelOverridesKey, JSON.stringify(cancelOverrides)); }catch(e){}
   try{ localStorage.setItem(manualLocksKey,   JSON.stringify(manualLocks)); }catch(e){}
+  try{ scheduleSaveOverridesToDB(); }catch(e){}
+
 }
-
 function jobKey(it, iso){
-  // 1) Best: stable DB UUID (Supabase)
-  const id = (it.id || it.uuid || '').toString().trim();
-  if(id) return 'ID:' + id;
-
-  // 2) WO = order_number (same concept, different field names)
-  const woVal = (
-    it.wo ??
-    it.order_number ??
-    (it.raw && it.raw.order_number) ??
-    ''
-  ).toString().trim();
-  if(woVal) return 'WO:' + woVal;
-
-  // 3) Fallback (least stable): site + date + slot
-  const site = (it.site || it.prov_site || it.site_name || '').toString().trim();
-  const plage = (it.plage || it.slot || '').toString().trim();
+  const wo = (it.wo||'').trim();
+  if(wo) return 'WO:' + wo;
+  const site = (it.site||'').trim();
+  const plage = (it.plage||'').trim();
   return 'SITE:' + site + '|' + iso + '|' + plage;
 }
-
-
-
-
-
 function setTechOverride(key, tech){ techOverrides[key] = tech; saveOverrides(); }
 function clearTechOverride(key){ delete techOverrides[key]; saveOverrides(); }
 function setPlageOverride(key, plage){ plageOverrides[key] = plage; saveOverrides(); }
@@ -2022,23 +2064,8 @@ function rebuildMonthsFromOverrides(){
 
 // ---------------------------------------------------------------------------
 
-// Build UI
-rebuildMonthsFromOverrides();   // ✅ must be before building UI
-populateFilters();
-
-for(const mid of Object.keys(payload.months)){
-  const m=payload.months[mid];
-  const tab=el('button',{class:'tab',id:'tab-'+mid},m.name);
-  tab.onclick=()=>activate(mid);
-  tabs.appendChild(tab);
-  content.appendChild(makePanel(mid,m));
-}
-
-activate(Object.keys(payload.months)[0]);
-renderKpis();
-
-activate(Object.keys(payload.months)[0]);
-renderKpis();
+// Build UI (DB-aware bootstrap)
+function wireHandlers(){
 regionFilter.onchange=rerenderActive;
 problemsOnly.onchange=rerenderActive;
 showCancelled.onchange=rerenderActive;
@@ -2049,6 +2076,56 @@ resetBtn.onclick=()=>{
   if(showCancelled) showCancelled.checked=false;
   rerenderActive();
 };
+}
+
+function buildUIFromPayload(){
+  // Apply overrides first so weeks/month view are correct
+  rebuildMonthsFromOverrides();
+
+  // Rebuild UI
+  populateFilters();
+  tabs.innerHTML = '';
+  content.innerHTML = '';
+
+  for(const mid of Object.keys(payload.months)){
+    const m = payload.months[mid];
+    const tab = el('button', {class:'tab', id:'tab-'+mid}, m.name);
+    tab.onclick = ()=>activate(mid);
+    tabs.appendChild(tab);
+    content.appendChild(makePanel(mid, m));
+  }
+
+  activate(Object.keys(payload.months)[0]);
+  renderKpis();
+  wireHandlers();
+}
+
+async function initApp(){
+  try{ __dbBootstrap = true; }catch(e){}
+
+  // Load overrides from DB (if table exists)
+  const pack = await dbLoadOverridePack();
+  if(pack){
+    techOverrides   = pack.tech_overrides   || {};
+    plageOverrides  = pack.plage_overrides  || {};
+    dateOverrides   = pack.date_overrides   || {};
+    cancelOverrides = pack.cancel_overrides || {};
+    manualLocks     = pack.manual_locks     || {};
+    // Save locally (bootstrap guard prevents DB write-back)
+    saveOverrides();
+  }
+
+  try{ __dbBootstrap = false; }catch(e){}
+
+  // Now render UI
+  buildUIFromPayload();
+}
+
+// Start (never blank)
+initApp().catch(err=>{
+  console.error('initApp failed, rendering local-only:', err);
+  try{ buildUIFromPayload(); }catch(e){ console.error('local render failed:', e); }
+});
 </script>
 <!-- Order search / edit modal -->
 <div id="orderSearchModal" class="modal" style="display:none" aria-hidden="true">
