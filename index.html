@@ -1870,6 +1870,8 @@ function isManualLocked(k){ return !!manualLocks[k]; }
 try{ techOverrides  = JSON.parse(localStorage.getItem(techOverridesKey)  || '{}') || {}; }catch(e){ techOverrides = {}; }
 try{ plageOverrides = JSON.parse(localStorage.getItem(plageOverridesKey) || '{}') || {}; }catch(e){ plageOverrides = {}; }
 try{ dateOverrides  = JSON.parse(localStorage.getItem(dateOverridesKey)  || '{}') || {}; }catch(e){ dateOverrides = {}; }
+try{ cancelOverrides = JSON.parse(localStorage.getItem(cancelOverridesKey) || '{}') || {}; }catch(e){ cancelOverrides = {}; }
+
 
 function saveOverrides(){
   try{ localStorage.setItem(techOverridesKey,  JSON.stringify(techOverrides)); }catch(e){}
@@ -1880,21 +1882,21 @@ function saveOverrides(){
 }
 
 function jobKey(it, iso){
-  // 1) Best key if your Supabase row has an id (stable across moves)
-  const id = (it.id || it.job_id || '').toString().trim();
+  // 1) Best: stable DB UUID (Supabase)
+  const id = (it.id || it.uuid || '').toString().trim();
   if(id) return 'ID:' + id;
 
-  // 2) WO == order_number (aliases)
-  const wo = (
-    it.wo ||
-    it.order_number ||
-    (it.raw && it.raw.order_number) ||
+  // 2) WO = order_number (same concept, different field names)
+  const woVal = (
+    it.wo ??
+    it.order_number ??
+    (it.raw && it.raw.order_number) ??
     ''
   ).toString().trim();
-  if(wo) return 'WO:' + wo;
+  if(woVal) return 'WO:' + woVal;
 
-  // 3) Fallback if no WO and no id
-  const site  = (it.site || it.prov_site || it.site_name || '').toString().trim();
+  // 3) Fallback (least stable): site + date + slot
+  const site = (it.site || it.prov_site || it.site_name || '').toString().trim();
   const plage = (it.plage || it.slot || '').toString().trim();
   return 'SITE:' + site + '|' + iso + '|' + plage;
 }
