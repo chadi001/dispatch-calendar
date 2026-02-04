@@ -1880,17 +1880,16 @@ function saveOverrides(){
 }
 function jobKey(it, iso){
   // 1) Best: stable DB UUID (Supabase)
-  const wo = (
-  it.wo ||
-  it.order_number ||
-  (it.raw && it.raw.order_number) ||
-  ''
-).toString().trim();
-
+  const id = (it.id || '').toString().trim();
   if(id) return 'ID:' + id;
 
-  // 2) WO = order_number (same thing, different field names)
-  const wo = (it.wo || it.order_number || '').toString().trim();
+  // 2) WO = order_number (same thing, different field names; also check raw.order_number)
+  const wo = (
+    it.wo ||
+    it.order_number ||
+    (it.raw && it.raw.order_number) ||
+    ''
+  ).toString().trim();
   if(wo) return 'WO:' + wo;
 
   // 3) Fallback if no WO and no id (least stable)
@@ -1898,6 +1897,7 @@ function jobKey(it, iso){
   const plage = (it.plage || it.slot || '').toString().trim();
   return 'SITE:' + site + '|' + iso + '|' + plage;
 }
+
 
 function setTechOverride(key, tech){ techOverrides[key] = tech; saveOverrides(); }
 function clearTechOverride(key){ delete techOverrides[key]; saveOverrides(); }
