@@ -1878,26 +1878,30 @@ function saveOverrides(){
   try{ localStorage.setItem(cancelOverridesKey, JSON.stringify(cancelOverrides)); }catch(e){}
   try{ localStorage.setItem(manualLocksKey,   JSON.stringify(manualLocks)); }catch(e){}
 }
+<script>
 function jobKey(it, iso){
-  // 1) Best: stable DB UUID (Supabase)
-  const id = (it.id || '').toString().trim();
-  if (id) return 'ID:' + id;
+  // 1) Best key: DB id if it exists
+  const idVal = (it && it.id != null) ? String(it.id).trim() : "";
+  if (idVal) return "ID:" + idVal;
 
-  // 2) WO == order_number (same thing, different field names)
-  const woVal = (
-    it.wo ||
-    it.order_number ||
-    (it.raw && it.raw.order_number) ||
-    ''
-  ).toString().trim();
+  // 2) WO == order_number (payload uses wo; DB uses order_number)
+  const woVal = String(
+    (it && (it.wo ?? it.order_number ?? (it.raw && it.raw.order_number))) ?? ""
+  ).trim();
+  if (woVal) return "WO:" + woVal;
 
-  if (woVal) return 'WO:' + woVal;
+  // 3) Fallback if no WO (least stable)
+  const siteVal = String(
+    (it && (it.site ?? it.prov_site ?? it.site_name)) ?? ""
+  ).trim();
+  const plageVal = String(
+    (it && (it.plage ?? it.slot)) ?? ""
+  ).trim();
 
-  // 3) Fallback if no WO and no id (least stable)
-  const site = (it.site || it.prov_site || it.site_name || '').toString().trim();
-  const plage = (it.plage || it.slot || '').toString().trim();
-  return 'SITE:' + site + '|' + iso + '|' + plage;
+  return "SITE:" + siteVal + "|" + iso + "|" + plageVal;
 }
+</script>
+
 
 
 
