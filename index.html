@@ -1880,7 +1880,13 @@ function saveOverrides(){
 }
 function jobKey(it, iso){
   // 1) Best: stable DB UUID (Supabase)
-  const id = (it.id || '').toString().trim();
+  const wo = (
+  it.wo ||
+  it.order_number ||
+  (it.raw && it.raw.order_number) ||
+  ''
+).toString().trim();
+
   if(id) return 'ID:' + id;
 
   // 2) WO = order_number (same thing, different field names)
