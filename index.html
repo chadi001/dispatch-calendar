@@ -178,7 +178,11 @@ button.reset:hover{background:#f6f8ff;}
 <!-- Supabase client -->
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
+  <!-- BUILD MARKER + SUPABASE INIT (FIRST INLINE SCRIPT) -->
 <script>
+  console.log("Dispatch Calendar build: 2026-02-04-01");
+  document.title = "Dispatch Calendar (2026-02-04-01)";
+  
   window.SUPABASE_URL = "https://mycgdissxzsizoywcwps.supabase.co";
   window.SUPABASE_ANON_KEY =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15Y2dkaXNzeHpzaXpveXdjd3BzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxNzkyNDEsImV4cCI6MjA4NTc1NTI0MX0.1-3qDwNwFeqlHjn-jCACOtV5U2yhgEsQ1yUM-m2TKZg";
@@ -188,9 +192,6 @@ button.reset:hover{background:#f6f8ff;}
     window.SUPABASE_URL,
     window.SUPABASE_ANON_KEY
   );
-  
-  console.log("Dispatch Calendar build: 2026-02-04-01");
-  document.title = "Dispatch Calendar (2026-02-04-01)";
 
 </script>
 
