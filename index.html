@@ -183,11 +183,6 @@ button.reset:hover{background:#f6f8ff;}
   console.log("Dispatch Calendar build: 2026-02-04-01");
   window.APP_BUILD = "2026-02-04-01";
 
-window.addEventListener("DOMContentLoaded", () => {
-  const el = document.getElementById("buildBadge");
-  if (el) el.textContent = "Build: " + window.APP_BUILD;
-});
-
   document.title = "Dispatch Calendar (2026-02-04-01)";
   
   window.SUPABASE_URL = "https://mycgdissxzsizoywcwps.supabase.co";
