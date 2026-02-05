@@ -2168,7 +2168,12 @@ initApp().catch(err=>{
   
   function attach(){
     const b = document.getElementById("buildBadge");
-    if (b) b.textContent = "Build: " + (window.APP_BUILD || "unknown");
+    if (b) {
+      b.textContent = "BuildBadge FOUND | APP_BUILD=" + String(window.APP_BUILD);
+  } else {
+  alert("buildBadge NOT FOUND in DOM");
+  }
+
     
     const close = (window.closeOrderSearch ? window.closeOrderSearch : function(){
       const m=$('orderSearchModal'); if(!m) return;
