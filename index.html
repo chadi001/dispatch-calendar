@@ -201,18 +201,23 @@ button.reset:hover{background:#f6f8ff;}
 
 <script>
 async function dbLoadJobs() {
+  const { data: { user } } = await window.sb.auth.getUser();
+  if (!user) return [];
+
   const { data, error } = await window.sb
     .from("jobs")
     .select("*")
-    .eq("cancelled", false);
+    .eq("cancelled", false)
+    .eq("tech_user_id", user.id);
 
   if (error) {
     console.error("DB load error:", error);
-    alert("Error loading jobs from database");
+    alert("Error loading jobs from database: " + error.message);
     return [];
   }
   return data;
 }
+
 
 async function dbUpsertJob(job) {
   const { data, error } = await window.sb
