@@ -310,7 +310,8 @@ function scheduleSaveOverridesToDB(){
   <div id="loginForm">
     <input id="loginEmail" type="email" placeholder="Email" style="width:100%; padding:8px; margin:6px 0;" />
     <input id="loginPass" type="password" placeholder="Password" style="width:100%; padding:8px; margin:6px 0;" />
-   <button id="btnLogin" type="button" onclick="alert('CLICK OK')" style="padding:8px 12px; margin-top:6px;">Sign in</button>
+    <button id="btnLogin" type="button" style="padding:8px 12px; margin-top:6px;">Sign in</button>
+
 
   </div>
 
@@ -2182,35 +2183,64 @@ initApp().catch(err=>{
 
 
 <script>
-/* Order search modal: late-bind handlers (fix for static hosting where script loads before modal markup) */
+/* Late-bind handlers (static hosting safe) */
 (function(){
   const $ = (id)=>document.getElementById(id);
-  
+
   function attach(){
-    const b = document.getElementById("buildBadge");
-    if (b) b.textContent = "Build: " + window.APP_BUILD;
-  
+    // Build badge
+    const b = $("buildBadge");
+    if (b) b.textContent = "Build: " + (window.APP_BUILD || "unknown");
+
+    // Order search modal
     const close = (window.closeOrderSearch ? window.closeOrderSearch : function(){
-      const m=$('orderSearchModal'); if(!m) return;
-      m.style.display='none'; m.setAttribute('aria-hidden','true');
+      const m=$("orderSearchModal"); if(!m) return;
+      m.style.display="none"; m.setAttribute("aria-hidden","true");
     });
     const run = (window.runOrderSearch ? window.runOrderSearch : function(){});
-    $('btnCloseOrderSearch')?.addEventListener('click', close);
-    $('orderSearchBackdrop')?.addEventListener('click', close);
-    $('btnRunOrderSearch')?.addEventListener('click', run);
-    $('btnClearOrderSearch')?.addEventListener('click', ()=>{
-      const inp=$('orderSearchInput'); if(inp) inp.value='';
+    $("btnCloseOrderSearch")?.addEventListener("click", close);
+    $("orderSearchBackdrop")?.addEventListener("click", close);
+    $("btnRunOrderSearch")?.addEventListener("click", run);
+    $("btnClearOrderSearch")?.addEventListener("click", ()=>{
+      const inp=$("orderSearchInput"); if(inp) inp.value="";
       if(window.renderOrderResults) window.renderOrderResults([]);
-      else { const r=$('orderSearchResults'); if(r) r.innerHTML=''; }
+      else { const r=$("orderSearchResults"); if(r) r.innerHTML=""; }
     });
-    $('orderSearchInput')?.addEventListener('keydown', (e)=>{
-      if(e.key==='Enter'){ e.preventDefault(); run(); }
-      if(e.key==='Escape'){ e.preventDefault(); close(); }
+    $("orderSearchInput")?.addEventListener("keydown", (e)=>{
+      if(e.key==="Enter"){ e.preventDefault(); run(); }
+      if(e.key==="Escape"){ e.preventDefault(); close(); }
+    });
+
+    // ✅ LOGIN
+    $("btnLogin")?.addEventListener("click", async () => {
+      const email = $("loginEmail")?.value.trim();
+      const password = $("loginPass")?.value;
+
+      if (!email || !password) { alert("Enter email + password"); return; }
+
+      const { error } = await window.sb.auth.signInWithPassword({ email, password });
+      if (error) { alert("Login error: " + error.message); return; }
+
+      $("authStatus").textContent = "Signed in as: " + email;
+      $("loginForm").style.display = "none";
+      $("logoutBox").style.display = "block";
+      $("appContent").style.display = "block";
+    });
+
+    // ✅ LOGOUT
+    $("btnLogout")?.addEventListener("click", async () => {
+      await window.sb.auth.signOut();
+      $("authStatus").textContent = "Not signed in";
+      $("loginForm").style.display = "block";
+      $("logoutBox").style.display = "none";
+      $("appContent").style.display = "none";
     });
   }
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', attach);
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", attach);
   else attach();
 })();
 </script>
+
 
 </body></html>
