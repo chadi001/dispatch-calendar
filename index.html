@@ -245,7 +245,7 @@ let __saveOvTimer = null;
 async function dbLoadOverridePack(){
   try{
     const { data, error } = await window.sb
-      .from('dispatch_overrides')
+      .from('dispatch_override_packs')
       .select('year, tech_overrides, plage_overrides, date_overrides, cancel_overrides, manual_locks')
       .eq('year', OVERRIDE_YEAR)
       .maybeSingle();
@@ -272,7 +272,7 @@ async function dbSaveOverridePack(){
       manual_locks: manualLocks || {}
     };
     const { error } = await window.sb
-      .from('dispatch_overrides')
+      .from('dispatch_override_packs')
       .upsert(pack, { onConflict: 'year' });
 
     if(error){
