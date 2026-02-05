@@ -2239,6 +2239,18 @@ initApp().catch(err=>{
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", attach);
   else attach();
+
+  // ✅ restore session on refresh
+window.sb.auth.getUser().then(({ data: { user } }) => {
+  if (user) {
+    const email = user.email || "";
+    document.getElementById("authStatus").textContent = "Signed in as: " + email;
+    document.getElementById("loginForm").style.display = "none";
+    document.getElementById("logoutBox").style.display = "block";
+    document.getElementById("appContent").style.display = "block";
+  }
+});
+
 })();
 </script>
 
