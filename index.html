@@ -2165,7 +2165,11 @@ initApp().catch(err=>{
 /* Order search modal: late-bind handlers (fix for static hosting where script loads before modal markup) */
 (function(){
   const $ = (id)=>document.getElementById(id);
+  
   function attach(){
+    const b = document.getElementById("buildBadge");
+    if (b) b.textContent = "Build: " + (window.APP_BUILD || "unknown");
+    
     const close = (window.closeOrderSearch ? window.closeOrderSearch : function(){
       const m=$('orderSearchModal'); if(!m) return;
       m.style.display='none'; m.setAttribute('aria-hidden','true');
