@@ -181,6 +181,13 @@ button.reset:hover{background:#f6f8ff;}
   <!-- BUILD MARKER + SUPABASE INIT (FIRST INLINE SCRIPT) -->
 <script>
   console.log("Dispatch Calendar build: 2026-02-04-01");
+  window.APP_BUILD = "2026-02-04-01";
+
+window.addEventListener("DOMContentLoaded", () => {
+  const el = document.getElementById("buildBadge");
+  if (el) el.textContent = "Build: " + window.APP_BUILD;
+});
+
   document.title = "Dispatch Calendar (2026-02-04-01)";
   
   window.SUPABASE_URL = "https://mycgdissxzsizoywcwps.supabase.co";
@@ -302,6 +309,8 @@ function scheduleSaveOverridesToDB(){
  
  </head><body>
 <h2>Dispatch Calendar</h2>
+<div id="buildBadge" style="font-size:12px;color:#666;margin:-6px 0 10px 0;"></div>
+
 <p class="small">
 Office: <b>4741 Boulevard des Laurentides #204, Laval, Quebec H7K 2Z6</b><br/>
 Tech priority: <b>Adil</b> → <b>Abdel</b>. Capacity: 1 AM + 1 PM per tech/day.
