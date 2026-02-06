@@ -310,8 +310,8 @@ async function dbBootstrapJobsIntoPayload(){
   if(typeof addJobToBaseMonths === "function"){
     addJobToBaseMonths(it, iso);
   }
-  if(__DUAL_WRITE_MONTHS && typeof addJobToMonths === "function"){
-    addJobToMonths(it, iso);
+ // if(__DUAL_WRITE_MONTHS && typeof addJobToMonths === "function"){
+  //  addJobToMonths(it, iso);
   }
 
 
@@ -617,7 +617,8 @@ function ensureTechColors(){
 ensureTechColors();
 
 
-applyManualJobsToPayload();
+// If we are using DB jobs, do NOT inject local manual jobs
+if (!window.USE_DB_JOBS) applyManualJobsToPayload();
 const tabs=document.getElementById('tabs');
 const content=document.getElementById('content');
 const regionFilter=document.getElementById('regionFilter');
@@ -2247,9 +2248,9 @@ async function initApp(){
     console.warn("DB bootstrap jobs failed, using local payload:", e);
   }
 
-
+// Do not render here. Rendering happens after login/session restore.
   // Now render UI
-  buildUIFromPayload();
+ // buildUIFromPayload();
 }
 
 // Start (never blank)
@@ -2325,6 +2326,10 @@ initApp().catch(err=>{
       $("loginForm").style.display = "none";
       $("logoutBox").style.display = "block";
       $("appContent").style.display = "block";
+      window.USE_DB_JOBS = true;
+      await dbBootstrapJobsIntoPayload();
+      buildUIFromPayload();
+
     });
 
     // ✅ LOGOUT
@@ -2348,6 +2353,9 @@ window.sb.auth.getUser().then(({ data: { user } }) => {
     document.getElementById("loginForm").style.display = "none";
     document.getElementById("logoutBox").style.display = "block";
     document.getElementById("appContent").style.display = "block";
+    window.USE_DB_JOBS = true;
+    dbBootstrapJobsIntoPayload().then(buildUIFromPayload);
+
   }
 });
 
