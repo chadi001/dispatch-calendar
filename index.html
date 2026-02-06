@@ -201,24 +201,32 @@ button.reset:hover{background:#f6f8ff;}
 
 <script>
   // HELPER FIRST
-  const __DUAL_WRITE_MONTHS = true; // set to false if you see duplicate jobs
+  const __DUAL_WRITE_MONTHS = false; // legacy flag (not used)
   
   async function dbLoadJobs() {
-  const { data: { user } } = await window.sb.auth.getUser();
+  const { data: { user }, error: userErr } = await window.sb.auth.getUser();
+  if (userErr) {
+    console.error("auth.getUser error:", userErr);
+    return [];
+  }
   if (!user) return [];
 
-  const { data, error } = await window.sb
+  // Some versions of the view used tech_user_id; others use assigned_to.
+  // Filter by either column so each tech only sees their own jobs.
+  const q = window.sb
     .from('v_jobs_calendar')
-    .select("*")
-    .eq("cancelled", false)
-    .eq("assigned_to", user.id);
+    .select('*')
+    .eq('cancelled', false)
+    .or(`assigned_to.eq.${user.id},tech_user_id.eq.${user.id}`);
+
+  const { data, error } = await q;
 
   if (error) {
     console.error("DB load error:", error);
     alert("Error loading jobs from database: " + error.message);
     return [];
   }
-  return data;
+  return data || [];
 }
 
 
@@ -299,36 +307,20 @@ function jobRowToPayloadItem(r){
 }
 
 async function dbBootstrapJobsIntoPayload(){
-  const rows = await dbLoadJobs(); // already filtered by assigned_to=user.id
-//  resetBaseMonthsKeepCalendarShape();
-    resetCalendarKeepShape();
+  const rows = await dbLoadJobs(); // filtered by current user (assigned_to / tech_user_id)
+  resetCalendarKeepShape();
+
   for(const r of (rows || [])){
-    const iso = r.job_date; // should be 'YYYY-MM-DD'
+    const iso = r.job_date; // 'YYYY-MM-DD'
     if(!iso) continue;
+
     const it = jobRowToPayloadItem(r);
 
-    // this function already exists in your file (used by CSV import)
-  if(typeof addJobToBaseMonths === "function"){
-    addJobToBaseMonths(it, iso);
+    // add into the base calendar; UI rebuild will derive payload.months from _baseMonths
+    if (typeof addJobToBaseMonths === "function") {
+      addJobToBaseMonths(it, iso);
+    }
   }
- // if(__DUAL_WRITE_MONTHS && typeof addJobToMonths === "function"){
-  //  addJobToMonths(it, iso);
-  }
-
-
-  }
-}
-
-  function addJobToMonths(it, iso){
-  // Reuse existing month indexing logic by temporarily pointing payload._baseMonths
-  // If your project already has a function addJobToMonths, do NOT add this.
-  const y = iso.slice(0,4);
-  const m = iso.slice(5,7);
-  const mid = `${y}-${m}`;
-
-  if(payload.months && payload.months[mid] && payload.months[mid].date_index){
-  payload.months[mid].date_index[iso] = payload.months[mid].date_index[iso] || [];
-  payload.months[mid].date_index[iso].push(it);
 }
 
 }
