@@ -245,6 +245,47 @@ async function dbUpdateJob(id, updates) {
     alert("Error updating job");
   }
 }
+  // --- Bootstrap DB jobs into the existing payload calendar ----
+
+function resetBaseMonthsKeepCalendarShape(){
+  // Keep month/weeks structure but wipe the jobs index
+  if(!window.payload || !payload._baseMonths) return;
+  for(const mid of Object.keys(payload._baseMonths)){
+    if(payload._baseMonths[mid] && payload._baseMonths[mid].date_index){
+      payload._baseMonths[mid].date_index = {};
+    }
+  }
+}
+
+function jobRowToPayloadItem(r){
+  return {
+    client: r.client || '',
+    site: r.prov_site || r.site || '',
+    wo: r.order_number || '',
+    province: r.province || '',
+    region: r.region || '',
+    destination: r.address || '',
+    url: r.google_maps_link || '',
+    plage: r.slot || '',
+    tech: r.effective_tech || r.resolved_tech || r.tech_name || 'UNASSIGNED',
+    _db_id: r.id
+  };
+}
+
+async function dbBootstrapJobsIntoPayload(){
+  const rows = await dbLoadJobs(); // already filtered by assigned_to=user.id
+  resetBaseMonthsKeepCalendarShape();
+
+  for(const r of (rows || [])){
+    const iso = r.job_date; // should be 'YYYY-MM-DD'
+    if(!iso) continue;
+    const it = jobRowToPayloadItem(r);
+
+    // this function already exists in your file (used by CSV import)
+    addJobToBaseMonths(it, iso);
+  }
+}
+
 </script>
 <script>
 // ---------------- DB sync for overrides (shared across devices) ----------------
@@ -2152,6 +2193,8 @@ async function initApp(){
   }
 
   try{ __dbBootstrap = false; }catch(e){}
+
+  await dbBootstrapJobsIntoPayload();
 
   // Now render UI
   buildUIFromPayload();
