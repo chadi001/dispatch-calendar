@@ -205,10 +205,10 @@ async function dbLoadJobs() {
   if (!user) return [];
 
   const { data, error } = await window.sb
-    .from('jobs')
+    .from('v_jobs_calendar')
     .select("*")
     .eq("cancelled", false)
-    .eq("tech_user_id", user.id);
+    .eq("assigned_to", user.id);
 
   if (error) {
     console.error("DB load error:", error);
