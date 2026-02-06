@@ -2194,7 +2194,12 @@ async function initApp(){
 
   try{ __dbBootstrap = false; }catch(e){}
 
-  await dbBootstrapJobsIntoPayload();
+  try{
+    await dbBootstrapJobsIntoPayload();
+  }catch(e){
+    console.warn("DB bootstrap jobs failed, using local payload:", e);
+  }
+
 
   // Now render UI
   buildUIFromPayload();
