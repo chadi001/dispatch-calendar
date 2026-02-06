@@ -205,7 +205,7 @@ async function dbLoadJobs() {
   if (!user) return [];
 
   const { data, error } = await window.sb
-    .from('v_jobs_calendar')
+    .from('jobs')
     .select("*")
     .eq("cancelled", false)
     .eq("tech_user_id", user.id);
@@ -221,7 +221,7 @@ async function dbLoadJobs() {
 
 async function dbUpsertJob(job) {
   const { data, error } = await window.sb
-    .from('v_jobs_calendar')
+    .from('jobs')
     .upsert(job)
     .select()
     .single();
@@ -236,7 +236,7 @@ async function dbUpsertJob(job) {
 
 async function dbUpdateJob(id, updates) {
   const { error } = await window.sb
-    .from('v_jobs_calendar')
+    .from('jobs')
     .update(updates)
     .eq("id", id);
 
