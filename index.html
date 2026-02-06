@@ -2212,7 +2212,6 @@ function buildUIFromPayload(){
 async function initApp(){
   try{ __dbBootstrap = true; }catch(e){}
 
-  // Load overrides from DB (if table exists)
   const pack = await dbLoadOverridePack();
   if(pack){
     techOverrides   = pack.tech_overrides   || {};
@@ -2220,22 +2219,12 @@ async function initApp(){
     dateOverrides   = pack.date_overrides   || {};
     cancelOverrides = pack.cancel_overrides || {};
     manualLocks     = pack.manual_locks     || {};
-    // Save locally (bootstrap guard prevents DB write-back)
     saveOverrides();
   }
 
   try{ __dbBootstrap = false; }catch(e){}
-
-  try{
-    await dbBootstrapJobsIntoPayload();
-  }catch(e){
-    console.warn("DB bootstrap jobs failed, using local payload:", e);
-  }
-
-// Do not render here. Rendering happens after login/session restore.
-  // Now render UI
- // buildUIFromPayload();
 }
+
 
 // Start (never blank)
 initApp().catch(err=>{
@@ -2329,21 +2318,32 @@ initApp().catch(err=>{
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", attach);
   else attach();
 
-  // ✅ restore session on refresh
-window.sb.auth.getUser().then(({ data: { user } }) => {
-  if (user) {
-    const email = user.email || "";
-    document.getElementById("authStatus").textContent = "Signed in as: " + email;
-    document.getElementById("loginForm").style.display = "none";
-    document.getElementById("logoutBox").style.display = "block";
-    document.getElementById("appContent").style.display = "block";
-    window.USE_DB_JOBS = true;
-    dbBootstrapJobsIntoPayload().then(buildUIFromPayload);
+  // ✅ restore session on refresh (bootstraps DB jobs, then renders)
+(async () => {
+  const { data: { user } } = await window.sb.auth.getUser();
+  if (!user) return;
 
+  const email = user.email || "";
+  document.getElementById("authStatus").textContent = "Signed in as: " + email;
+  document.getElementById("loginForm").style.display = "none";
+  document.getElementById("logoutBox").style.display = "block";
+  document.getElementById("appContent").style.display = "block";
+
+  window.USE_DB_JOBS = true;
+
+  try {
+    // Ensure overrides are loaded first (initApp already does that)
+    // If initApp is async and you want to guarantee it finished, call it here too:
+    // await initApp();
+
+    await dbBootstrapJobsIntoPayload();
+  } catch (e) {
+    console.warn("Session restore: DB bootstrap failed, rendering local payload:", e);
   }
-});
 
+  buildUIFromPayload();
 })();
+
 </script>
 
 
