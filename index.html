@@ -204,10 +204,12 @@ button.reset:hover{background:#f6f8ff;}
  // const __DUAL_WRITE_MONTHS = true; // set to false if you see duplicate jobs
   
   async function dbLoadJobs() {
-  const { data: { user } } = await window.sb.auth.getUser();
+  const { data: { user }, error: userErr } = await window.sb.auth.getUser();
+  console.log("[dbLoadJobs] user:", user?.id, user?.email, "err:", userErr);
+
   if (!user) return [];
 
-  // 1) Find the tech_name mapped to this auth user
+  // tech_name for this user
   const { data: mapRow, error: mapErr } = await window.sb
     .from("tech_name_map")
     .select("tech_name")
@@ -215,33 +217,30 @@ button.reset:hover{background:#f6f8ff;}
     .eq("is_active", true)
     .maybeSingle();
 
-  if (mapErr) {
-    console.error("tech_name_map lookup error:", mapErr);
-    alert("Error loading tech profile: " + mapErr.message);
+  console.log("[dbLoadJobs] tech_name_map:", mapRow, "err:", mapErr);
+
+  if (mapErr) throw mapErr;
+
+  const myTechName = mapRow?.tech_name;
+  if (!myTechName) {
+    // IMPORTANT: if you have no mapping, DO NOT show anything (prevents “all jobs”)
+    console.warn("[dbLoadJobs] No tech_name mapping for this user_id:", user.id);
     return [];
   }
 
-  const myTechName = mapRow?.tech_name || null;
-
-  // Dispatcher/admin fallback: if no tech_name mapping, show nothing (safer)
-  // If later you want dispatcher to see all, we can add an explicit dispatcher rule.
-  if (!myTechName) return [];
-
-  // 2) Load only jobs for that tech name (from view)
+  // Load only jobs for that tech
   const { data, error } = await window.sb
     .from("v_jobs_calendar")
     .select("*")
     .eq("cancelled", false)
     .eq("resolved_tech", myTechName);
 
-  if (error) {
-    console.error("DB load error:", error);
-    alert("Error loading jobs from database: " + error.message);
-    return [];
-  }
+  console.log("[dbLoadJobs] filter resolved_tech =", myTechName, "rows:", data?.length, "err:", error);
 
+  if (error) throw error;
   return data || [];
 }
+
 
 
 
@@ -273,15 +272,26 @@ async function dbUpdateJob(id, updates) {
 }
   // --- Bootstrap DB jobs into the existing payload calendar ----
 
- function resetBaseMonthsKeepCalendarShape(){
-  // Keep month/weeks structure but wipe the jobs index
-   if(!window.payload || !payload._baseMonths) return;
-   for(const mid of Object.keys(payload._baseMonths)){
-    if(payload._baseMonths[mid] && payload._baseMonths[mid].date_index){
+function resetCalendarKeepShape(){
+  if (!window.payload) return;
+
+  // Always reset date_index to a clean object (even if it didn't exist)
+  if (payload._baseMonths) {
+    for (const mid of Object.keys(payload._baseMonths)) {
+      if (!payload._baseMonths[mid]) continue;
       payload._baseMonths[mid].date_index = {};
     }
   }
+
+  if (payload.months) {
+    for (const mid of Object.keys(payload.months)) {
+      if (!payload.months[mid]) continue;
+      payload.months[mid].date_index = {};
+    }
+  }
 }
+
+
 
   
 
@@ -303,15 +313,21 @@ function jobRowToPayloadItem(r){
 
 async function dbBootstrapJobsIntoPayload(){
   const rows = await dbLoadJobs();
-  resetBaseMonthsKeepCalendarShape();
+
+  // ✅ THIS is the important line
+  resetCalendarKeepShape();
 
   for(const r of (rows || [])){
-    const iso = r.job_date; // 'YYYY-MM-DD'
+    const iso = r.job_date;
     if(!iso) continue;
 
-      addJobToBaseMonths(jobRowToPayloadItem(r), iso);
+    const it = jobRowToPayloadItem(r);
+
+    // ✅ Only write to base months
+    addJobToBaseMonths(it, iso);
   }
 }
+
 
 
 
