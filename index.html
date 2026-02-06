@@ -200,7 +200,9 @@ button.reset:hover{background:#f6f8ff;}
 
 
 <script>
-async function dbLoadJobs() {
+  const __DUAL_WRITE_MONTHS = true; // set to false if you see duplicate jobs
+  
+  async function dbLoadJobs() {
   const { data: { user } } = await window.sb.auth.getUser();
   if (!user) return [];
 
@@ -247,15 +249,38 @@ async function dbUpdateJob(id, updates) {
 }
   // --- Bootstrap DB jobs into the existing payload calendar ----
 
-function resetBaseMonthsKeepCalendarShape(){
+//--- function resetBaseMonthsKeepCalendarShape(){
   // Keep month/weeks structure but wipe the jobs index
-  if(!window.payload || !payload._baseMonths) return;
-  for(const mid of Object.keys(payload._baseMonths)){
-    if(payload._baseMonths[mid] && payload._baseMonths[mid].date_index){
-      payload._baseMonths[mid].date_index = {};
+//  if(!window.payload || !payload._baseMonths) return;
+//  for(const mid of Object.keys(payload._baseMonths)){
+ //   if(payload._baseMonths[mid] && payload._baseMonths[mid].date_index){
+ //     payload._baseMonths[mid].date_index = {};
+ //   }
+//  }
+//}
+
+  function resetCalendarKeepShape(){
+  if(!window.payload) return;
+
+  // Wipe base months
+  if(payload._baseMonths){
+    for(const mid of Object.keys(payload._baseMonths)){
+      if(payload._baseMonths[mid] && payload._baseMonths[mid].date_index){
+        payload._baseMonths[mid].date_index = {};
+      }
+    }
+  }
+
+  // Wipe rendered months (this is what UI uses)
+  if(payload.months){
+    for(const mid of Object.keys(payload.months)){
+      if(payload.months[mid] && payload.months[mid].date_index){
+        payload.months[mid].date_index = {};
+      }
     }
   }
 }
+
 
 function jobRowToPayloadItem(r){
   return {
@@ -274,17 +299,39 @@ function jobRowToPayloadItem(r){
 
 async function dbBootstrapJobsIntoPayload(){
   const rows = await dbLoadJobs(); // already filtered by assigned_to=user.id
-  resetBaseMonthsKeepCalendarShape();
-
+//  resetBaseMonthsKeepCalendarShape();
+    resetCalendarKeepShape();
   for(const r of (rows || [])){
     const iso = r.job_date; // should be 'YYYY-MM-DD'
     if(!iso) continue;
     const it = jobRowToPayloadItem(r);
 
     // this function already exists in your file (used by CSV import)
+  if(typeof addJobToBaseMonths === "function"){
     addJobToBaseMonths(it, iso);
   }
+  if(__DUAL_WRITE_MONTHS && typeof addJobToMonths === "function"){
+    addJobToMonths(it, iso);
+  }
+
+
+  }
 }
+
+  function addJobToMonths(it, iso){
+  // Reuse existing month indexing logic by temporarily pointing payload._baseMonths
+  // If your project already has a function addJobToMonths, do NOT add this.
+  const y = iso.slice(0,4);
+  const m = iso.slice(5,7);
+  const mid = `${y}-${m}`;
+
+  if(payload.months && payload.months[mid] && payload.months[mid].date_index){
+  payload.months[mid].date_index[iso] = payload.months[mid].date_index[iso] || [];
+  payload.months[mid].date_index[iso].push(it);
+}
+
+}
+
 
 </script>
 <script>
