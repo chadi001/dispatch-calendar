@@ -201,25 +201,48 @@ button.reset:hover{background:#f6f8ff;}
 
 <script>
   // HELPER FIRST
-  const __DUAL_WRITE_MONTHS = true; // set to false if you see duplicate jobs
+ // const __DUAL_WRITE_MONTHS = true; // set to false if you see duplicate jobs
   
   async function dbLoadJobs() {
   const { data: { user } } = await window.sb.auth.getUser();
   if (!user) return [];
 
+  // 1) Find the tech_name mapped to this auth user
+  const { data: mapRow, error: mapErr } = await window.sb
+    .from("tech_name_map")
+    .select("tech_name")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (mapErr) {
+    console.error("tech_name_map lookup error:", mapErr);
+    alert("Error loading tech profile: " + mapErr.message);
+    return [];
+  }
+
+  const myTechName = mapRow?.tech_name || null;
+
+  // Dispatcher/admin fallback: if no tech_name mapping, show nothing (safer)
+  // If later you want dispatcher to see all, we can add an explicit dispatcher rule.
+  if (!myTechName) return [];
+
+  // 2) Load only jobs for that tech name (from view)
   const { data, error } = await window.sb
-    .from('v_jobs_calendar')
+    .from("v_jobs_calendar")
     .select("*")
     .eq("cancelled", false)
-    .eq("assigned_to", user.id);
+    .eq("resolved_tech", myTechName);
 
   if (error) {
     console.error("DB load error:", error);
     alert("Error loading jobs from database: " + error.message);
     return [];
   }
-  return data;
+
+  return data || [];
 }
+
 
 
 async function dbUpsertJob(job) {
@@ -250,37 +273,17 @@ async function dbUpdateJob(id, updates) {
 }
   // --- Bootstrap DB jobs into the existing payload calendar ----
 
-//--- function resetBaseMonthsKeepCalendarShape(){
+ function resetBaseMonthsKeepCalendarShape(){
   // Keep month/weeks structure but wipe the jobs index
-//  if(!window.payload || !payload._baseMonths) return;
-//  for(const mid of Object.keys(payload._baseMonths)){
- //   if(payload._baseMonths[mid] && payload._baseMonths[mid].date_index){
- //     payload._baseMonths[mid].date_index = {};
- //   }
-//  }
-//}
-
-  function resetCalendarKeepShape(){
-  if(!window.payload) return;
-
-  // Wipe base months
-  if(payload._baseMonths){
-    for(const mid of Object.keys(payload._baseMonths)){
-      if(payload._baseMonths[mid] && payload._baseMonths[mid].date_index){
-        payload._baseMonths[mid].date_index = {};
-      }
-    }
-  }
-
-  // Wipe rendered months (this is what UI uses)
-  if(payload.months){
-    for(const mid of Object.keys(payload.months)){
-      if(payload.months[mid] && payload.months[mid].date_index){
-        payload.months[mid].date_index = {};
-      }
+   if(!window.payload || !payload._baseMonths) return;
+   for(const mid of Object.keys(payload._baseMonths)){
+    if(payload._baseMonths[mid] && payload._baseMonths[mid].date_index){
+      payload._baseMonths[mid].date_index = {};
     }
   }
 }
+
+  
 
 
 function jobRowToPayloadItem(r){
@@ -299,38 +302,19 @@ function jobRowToPayloadItem(r){
 }
 
 async function dbBootstrapJobsIntoPayload(){
-  const rows = await dbLoadJobs(); // already filtered by assigned_to=user.id
-  resetCalendarKeepShape();
+  const rows = await dbLoadJobs();
+  resetBaseMonthsKeepCalendarShape();
 
   for(const r of (rows || [])){
     const iso = r.job_date; // 'YYYY-MM-DD'
     if(!iso) continue;
 
-    const it = jobRowToPayloadItem(r);
-
-    if(typeof addJobToBaseMonths === "function"){
-      addJobToBaseMonths(it, iso);
-    }
-
-    if(__DUAL_WRITE_MONTHS && typeof addJobToMonths === "function"){
-      addJobToMonths(it, iso);
-    }
+      addJobToBaseMonths(jobRowToPayloadItem(r), iso);
   }
 }
 
-function addJobToMonths(it, iso){
-  // Reuse existing month indexing logic by temporarily pointing payload._baseMonths
-  // If your project already has a function addJobToMonths, do NOT add this.
-  const y = iso.slice(0,4);
-  const m = iso.slice(5,7);
-  const mid = `${y}-${m}`;
 
-  if(payload.months && payload.months[mid] && payload.months[mid].date_index){
-  payload.months[mid].date_index[iso] = payload.months[mid].date_index[iso] || [];
-  payload.months[mid].date_index[iso].push(it);
-}
 
-}
 
 
 </script>
