@@ -2257,97 +2257,54 @@ initApp().catch(err=>{
 
 
 <script>
-/* Late-bind handlers (static hosting safe) */
-(function(){
-  const $ = (id)=>document.getElementById(id);
+(function () {
+  const $ = (id) => document.getElementById(id);
 
-  function attach(){
-    // Build badge
-    const b = $("buildBadge");
-    if (b) b.textContent = "Build: " + (window.APP_BUILD || "unknown");
+  async function doLogin(e) {
+    if (e) e.preventDefault();
 
-    // Order search modal
-    const close = (window.closeOrderSearch ? window.closeOrderSearch : function(){
-      const m=$("orderSearchModal"); if(!m) return;
-      m.style.display="none"; m.setAttribute("aria-hidden","true");
-    });
-    const run = (window.runOrderSearch ? window.runOrderSearch : function(){});
-    $("btnCloseOrderSearch")?.addEventListener("click", close);
-    $("orderSearchBackdrop")?.addEventListener("click", close);
-    $("btnRunOrderSearch")?.addEventListener("click", run);
-    $("btnClearOrderSearch")?.addEventListener("click", ()=>{
-      const inp=$("orderSearchInput"); if(inp) inp.value="";
-      if(window.renderOrderResults) window.renderOrderResults([]);
-      else { const r=$("orderSearchResults"); if(r) r.innerHTML=""; }
-    });
-    $("orderSearchInput")?.addEventListener("keydown", (e)=>{
-      if(e.key==="Enter"){ e.preventDefault(); run(); }
-      if(e.key==="Escape"){ e.preventDefault(); close(); }
-    });
-(function(){
-  function $(id){ return document.getElementById(id); }
+    const email = $("loginEmail")?.value?.trim();
+    const password = $("loginPass")?.value;
 
-  function attach(){
-    // ✅ LOGIN
-    const loginBtn = $("btnLogin");
-const loginFormEl = $("loginForm");
+    console.log("doLogin() called", { email, pwlen: password ? password.length : 0 });
 
-console.log("attach() running. btnLogin =", loginBtn, "loginForm =", loginFormEl);
+    if (!email || !password) {
+      alert("Enter email + password");
+      return;
+    }
 
-// Handle both form submit and button click
-async function doLogin(e){
-  if (e) e.preventDefault();
+    if (!window.sb) {
+      console.error("Supabase client window.sb is missing");
+      alert("Supabase is not initialized (window.sb missing)");
+      return;
+    }
 
-  console.log("doLogin() called");
+    const { error } = await window.sb.auth.signInWithPassword({ email, password });
+    if (error) {
+      console.error("Login error:", error);
+      alert("Login error: " + error.message);
+      return;
+    }
 
-  const email = $("loginEmail")?.value?.trim();
-  const password = $("loginPass")?.value;
+    $("authStatus").textContent = "Signed in as: " + email;
+    $("loginForm").style.display = "none";
+    $("logoutBox").style.display = "block";
+    $("appContent").style.display = "block";
 
-  console.log("email field =", email, "password length =", password ? password.length : 0);
+    window.USE_DB_JOBS = true;
 
-  if (!email || !password) { alert("Enter email + password"); return; }
+    try {
+      await dbBootstrapJobsIntoPayload();
+    } catch (err) {
+      console.warn("DB bootstrap failed:", err);
+    }
 
-  const { error } = await window.sb.auth.signInWithPassword({ email, password });
-  if (error) { console.error("Login error:", error); alert("Login error: " + error.message); return; }
-
-  $("authStatus").textContent = "Signed in as: " + email;
-  $("loginForm").style.display = "none";
-  $("logoutBox").style.display = "block";
-  $("appContent").style.display = "block";
-
-  window.USE_DB_JOBS = true;
-
-  try { await dbBootstrapJobsIntoPayload(); } catch(e){ console.warn("bootstrap failed:", e); }
-  buildUIFromPayload();
-}
-
-// If there is a FORM, listen to submit
-if (loginFormEl) {
-  loginFormEl.addEventListener("submit", doLogin);
-}
-
-// Always listen to button click
-if (loginBtn) {
-  loginBtn.addEventListener("click", doLogin);
-  });
-}
-
-
-    // ✅ LOGOUT
-    $("btnLogout")?.addEventListener("click", async () => {
-      await window.sb.auth.signOut();
-      $("authStatus").textContent = "Not signed in";
-      $("loginForm").style.display = "block";
-      $("logoutBox").style.display = "none";
-      $("appContent").style.display = "none";
-    });
+    buildUIFromPayload();
   }
 
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", attach);
-  else attach();
+  async function restoreSession() {
+    if (!window.sb) return;
 
-  // ✅ restore session on refresh
-  (async () => {
     const { data: { user } } = await window.sb.auth.getUser();
     if (!user) return;
 
@@ -2359,13 +2316,70 @@ if (loginBtn) {
 
     window.USE_DB_JOBS = true;
 
-    try { await dbBootstrapJobsIntoPayload(); } catch(e){ console.warn(e); }
+    try {
+      await dbBootstrapJobsIntoPayload();
+    } catch (err) {
+      console.warn("Session restore bootstrap failed:", err);
+    }
+
     buildUIFromPayload();
-  })();
+  }
 
+  function attach() {
+    console.log("attach() binding handlers");
+
+    // Login (button + form submit)
+    const loginBtn = $("btnLogin");
+    const loginForm = $("loginForm");
+
+    if (loginForm) loginForm.addEventListener("submit", doLogin);
+    if (loginBtn) loginBtn.addEventListener("click", doLogin);
+
+    // Logout
+    $("btnLogout")?.addEventListener("click", async () => {
+      await window.sb.auth.signOut();
+      $("authStatus").textContent = "Not signed in";
+      $("loginForm").style.display = "block";
+      $("logoutBox").style.display = "none";
+      $("appContent").style.display = "none";
+    });
+
+    // Order search modal bindings (keep these simple)
+    const close = window.closeOrderSearch || function () {
+      const m = $("orderSearchModal");
+      if (!m) return;
+      m.style.display = "none";
+      m.setAttribute("aria-hidden", "true");
+    };
+
+    const run = window.runOrderSearch || function () {};
+
+    $("btnCloseOrderSearch")?.addEventListener("click", close);
+    $("orderSearchBackdrop")?.addEventListener("click", close);
+    $("btnRunOrderSearch")?.addEventListener("click", run);
+    $("btnClearOrderSearch")?.addEventListener("click", () => {
+      const inp = $("orderSearchInput");
+      if (inp) inp.value = "";
+      if (window.renderOrderResults) window.renderOrderResults([]);
+      else { const r = $("orderSearchResults"); if (r) r.innerHTML = ""; }
+    });
+
+    $("orderSearchInput")?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); run(); }
+      if (e.key === "Escape") { e.preventDefault(); close(); }
+    });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => {
+      attach();
+      restoreSession();
+    });
+  } else {
+    attach();
+    restoreSession();
+  }
 })();
-
-
 </script>
 
 
