@@ -2284,7 +2284,10 @@ initApp().catch(err=>{
       if(e.key==="Enter"){ e.preventDefault(); run(); }
       if(e.key==="Escape"){ e.preventDefault(); close(); }
     });
+(function(){
+  function $(id){ return document.getElementById(id); }
 
+  function attach(){
     // ✅ LOGIN
     $("btnLogin")?.addEventListener("click", async () => {
       const email = $("loginEmail")?.value.trim();
@@ -2299,10 +2302,11 @@ initApp().catch(err=>{
       $("loginForm").style.display = "none";
       $("logoutBox").style.display = "block";
       $("appContent").style.display = "block";
-      window.USE_DB_JOBS = true;
-      await dbBootstrapJobsIntoPayload();
-      buildUIFromPayload();
 
+      window.USE_DB_JOBS = true;
+
+      try { await dbBootstrapJobsIntoPayload(); } catch(e){ console.warn(e); }
+      buildUIFromPayload();
     });
 
     // ✅ LOGOUT
@@ -2318,31 +2322,25 @@ initApp().catch(err=>{
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", attach);
   else attach();
 
-  // ✅ restore session on refresh (bootstraps DB jobs, then renders)
-(async () => {
-  const { data: { user } } = await window.sb.auth.getUser();
-  if (!user) return;
+  // ✅ restore session on refresh
+  (async () => {
+    const { data: { user } } = await window.sb.auth.getUser();
+    if (!user) return;
 
-  const email = user.email || "";
-  document.getElementById("authStatus").textContent = "Signed in as: " + email;
-  document.getElementById("loginForm").style.display = "none";
-  document.getElementById("logoutBox").style.display = "block";
-  document.getElementById("appContent").style.display = "block";
+    const email = user.email || "";
+    $("authStatus").textContent = "Signed in as: " + email;
+    $("loginForm").style.display = "none";
+    $("logoutBox").style.display = "block";
+    $("appContent").style.display = "block";
 
-  window.USE_DB_JOBS = true;
+    window.USE_DB_JOBS = true;
 
-  try {
-    // Ensure overrides are loaded first (initApp already does that)
-    // If initApp is async and you want to guarantee it finished, call it here too:
-    // await initApp();
+    try { await dbBootstrapJobsIntoPayload(); } catch(e){ console.warn(e); }
+    buildUIFromPayload();
+  })();
 
-    await dbBootstrapJobsIntoPayload();
-  } catch (e) {
-    console.warn("Session restore: DB bootstrap failed, rendering local payload:", e);
-  }
-
-  buildUIFromPayload();
 })();
+
 
 </script>
 
