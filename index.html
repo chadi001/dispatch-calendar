@@ -2289,25 +2289,49 @@ initApp().catch(err=>{
 
   function attach(){
     // ✅ LOGIN
-    $("btnLogin")?.addEventListener("click", async () => {
-      const email = $("loginEmail")?.value.trim();
-      const password = $("loginPass")?.value;
+    const loginBtn = $("btnLogin");
+const loginFormEl = $("loginForm");
 
-      if (!email || !password) { alert("Enter email + password"); return; }
+console.log("attach() running. btnLogin =", loginBtn, "loginForm =", loginFormEl);
 
-      const { error } = await window.sb.auth.signInWithPassword({ email, password });
-      if (error) { alert("Login error: " + error.message); return; }
+// Handle both form submit and button click
+async function doLogin(e){
+  if (e) e.preventDefault();
 
-      $("authStatus").textContent = "Signed in as: " + email;
-      $("loginForm").style.display = "none";
-      $("logoutBox").style.display = "block";
-      $("appContent").style.display = "block";
+  console.log("doLogin() called");
 
-      window.USE_DB_JOBS = true;
+  const email = $("loginEmail")?.value?.trim();
+  const password = $("loginPass")?.value;
 
-      try { await dbBootstrapJobsIntoPayload(); } catch(e){ console.warn(e); }
-      buildUIFromPayload();
-    });
+  console.log("email field =", email, "password length =", password ? password.length : 0);
+
+  if (!email || !password) { alert("Enter email + password"); return; }
+
+  const { error } = await window.sb.auth.signInWithPassword({ email, password });
+  if (error) { console.error("Login error:", error); alert("Login error: " + error.message); return; }
+
+  $("authStatus").textContent = "Signed in as: " + email;
+  $("loginForm").style.display = "none";
+  $("logoutBox").style.display = "block";
+  $("appContent").style.display = "block";
+
+  window.USE_DB_JOBS = true;
+
+  try { await dbBootstrapJobsIntoPayload(); } catch(e){ console.warn("bootstrap failed:", e); }
+  buildUIFromPayload();
+}
+
+// If there is a FORM, listen to submit
+if (loginFormEl) {
+  loginFormEl.addEventListener("submit", doLogin);
+}
+
+// Always listen to button click
+if (loginBtn) {
+  loginBtn.addEventListener("click", doLogin);
+  });
+}
+
 
     // ✅ LOGOUT
     $("btnLogout")?.addEventListener("click", async () => {
