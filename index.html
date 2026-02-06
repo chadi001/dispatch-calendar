@@ -194,6 +194,8 @@ button.reset:hover{background:#f6f8ff;}
     window.SUPABASE_URL,
     window.SUPABASE_ANON_KEY
   );
+  window.USE_DB_JOBS = false; // default: do NOT use DB until signed in
+
 
 </script>
 
@@ -202,7 +204,10 @@ button.reset:hover{background:#f6f8ff;}
 <script>
   // HELPER FIRST
  // const __DUAL_WRITE_MONTHS = true; // set to false if you see duplicate jobs
-  
+ 
+  window.__DB_BOOTSTRAPPED = window.__DB_BOOTSTRAPPED || false;
+
+
   async function dbLoadJobs() {
   const { data: { user }, error: userErr } = await window.sb.auth.getUser();
   console.log("[dbLoadJobs] user:", user?.id, user?.email, "err:", userErr);
@@ -239,9 +244,7 @@ button.reset:hover{background:#f6f8ff;}
 
   if (error) throw error;
   return data || [];
-}
-
-
+} // ✅ CLOSE dbLoadJobs()
 
 
 async function dbUpsertJob(job) {
@@ -293,9 +296,6 @@ function resetCalendarKeepShape(){
 
 
 
-  
-
-
 function jobRowToPayloadItem(r){
   return {
     client: r.client || '',
@@ -327,9 +327,6 @@ async function dbBootstrapJobsIntoPayload(){
     addJobToBaseMonths(it, iso);
   }
 }
-
-
-
 
 
 
@@ -618,7 +615,9 @@ ensureTechColors();
 
 
 // If we are using DB jobs, do NOT inject local manual jobs
-if (!window.USE_DB_JOBS) applyManualJobsToPayload();
+// Only inject local jobs if DB mode is explicitly OFF
+if (window.USE_DB_JOBS === false) applyManualJobsToPayload();
+
 const tabs=document.getElementById('tabs');
 const content=document.getElementById('content');
 const regionFilter=document.getElementById('regionFilter');
@@ -2244,9 +2243,14 @@ async function initApp(){
 
 // Start (never blank)
 initApp().catch(err=>{
-  console.error('initApp failed, rendering local-only:', err);
-  try{ buildUIFromPayload(); }catch(e){ console.error('local render failed:', e); }
+  console.error('initApp failed:', err);
+
+  // Render local-only ONLY if DB mode is not enabled
+  if(!window.USE_DB_JOBS){
+    try{ buildUIFromPayload(); }catch(e){ console.error('local render failed:', e); }
+  }
 });
+
 </script>
 <!-- Order search / edit modal -->
 <div id="orderSearchModal" class="modal" style="display:none" aria-hidden="true">
@@ -2275,6 +2279,10 @@ initApp().catch(err=>{
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
+
+  // ✅ Run-once guard (important)
+  window.__DB_BOOTSTRAPPED = false; // always bootstrap once per page load
+
 
   async function doLogin(e) {
     if (e) e.preventDefault();
@@ -2309,13 +2317,17 @@ initApp().catch(err=>{
 
     window.USE_DB_JOBS = true;
 
-    try {
+   try {
+    if (!window.__DB_BOOTSTRAPPED) {
+      window.__DB_BOOTSTRAPPED = true;
       await dbBootstrapJobsIntoPayload();
-    } catch (err) {
-      console.warn("DB bootstrap failed:", err);
     }
+  } catch (err) {
+    console.warn("DB bootstrap failed:", err);
+  }
 
-    buildUIFromPayload();
+buildUIFromPayload();
+
   }
 
   async function restoreSession() {
@@ -2332,13 +2344,17 @@ initApp().catch(err=>{
 
     window.USE_DB_JOBS = true;
 
-    try {
+   try {
+    if (!window.__DB_BOOTSTRAPPED) {
+      window.__DB_BOOTSTRAPPED = true;
       await dbBootstrapJobsIntoPayload();
-    } catch (err) {
-      console.warn("Session restore bootstrap failed:", err);
     }
+  } catch (err) {
+    console.warn("Session restore bootstrap failed:", err);
+  }
 
-    buildUIFromPayload();
+  buildUIFromPayload();
+
   }
 
   function attach() {
@@ -2352,13 +2368,16 @@ initApp().catch(err=>{
     if (loginBtn) loginBtn.addEventListener("click", doLogin);
 
     // Logout
-    $("btnLogout")?.addEventListener("click", async () => {
+      $("btnLogout")?.addEventListener("click", async () => {
       await window.sb.auth.signOut();
+      window.__DB_BOOTSTRAPPED = false; // ✅ allow bootstrap next login
+  
+
       $("authStatus").textContent = "Not signed in";
       $("loginForm").style.display = "block";
       $("logoutBox").style.display = "none";
       $("appContent").style.display = "none";
-    });
+      });
 
     // Order search modal bindings (keep these simple)
     const close = window.closeOrderSearch || function () {
