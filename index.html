@@ -215,30 +215,33 @@ button.reset:hover{background:#f6f8ff;}
   if (!user) return [];
 
   // tech_name for this user
-  const { data: mapRow, error: mapErr } = await window.sb
-    .from("tech_name_map")
-    .select("tech_name")
-    .eq("user_id", user.id)
-    .eq("is_active", true)
-    .maybeSingle();
+  // tech_code for this user (from tech_profiles)
+const { data: profile, error: mapErr } = await window.sb
+  .from("tech_profiles")
+  .select("tech_code")
+  .eq("user_id", user.id)
+  .eq("is_active", true)
+  .maybeSingle();
 
-  console.log("[dbLoadJobs] tech_name_map:", mapRow, "err:", mapErr);
+console.log("[dbLoadJobs] tech_profiles:", profile, "err:", mapErr);
 
-  if (mapErr) throw mapErr;
+if (mapErr) throw mapErr;
 
-  const myTechName = mapRow?.tech_name;
-  if (!myTechName) {
-    // IMPORTANT: if you have no mapping, DO NOT show anything (prevents “all jobs”)
-    console.warn("[dbLoadJobs] No tech_name mapping for this user_id:", user.id);
-    return [];
-  }
+const myTechCode = profile?.tech_code;
+if (!myTechCode) {
+// IMPORTANT: if you have no mapping, DO NOT show anything (prevents “all jobs”)
+  console.warn("[dbLoadJobs] No tech profile mapping for this user_id:", user.id);
+  return [];
+}
+
 
   // Load only jobs for that tech
   const { data, error } = await window.sb
     .from("v_jobs_calendar")
     .select("*")
     .eq("cancelled", false)
-    .eq("resolved_tech", myTechName);
+    .eq("resolved_tech", myTechCode);
+
 
   console.log("[dbLoadJobs] filter resolved_tech =", myTechName, "rows:", data?.length, "err:", error);
 
