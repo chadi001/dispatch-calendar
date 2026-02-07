@@ -315,19 +315,24 @@ function jobRowToPayloadItem(r){
 async function dbBootstrapJobsIntoPayload(){
   const rows = await dbLoadJobs();
 
-  // DB is the ONLY source of jobs -> rebuild base months from a clean template
-  if(!window.payload || !payload.__monthTemplate){
-    console.warn("[dbBootstrapJobsIntoPayload] missing payload template");
+  if(!window.payload){
+    console.warn("[dbBootstrapJobsIntoPayload] payload missing");
     return;
   }
 
-  // Start from EMPTY template (structure only)
+  // ✅ Self-heal: build the template if it wasn't created yet
+  if(!payload.__monthTemplate){
+    payload.__monthTemplate = JSON.parse(JSON.stringify(payload.months || {}));
+  }
+
+  // ✅ Always start from EMPTY template (structure only)
   payload._baseMonths = JSON.parse(JSON.stringify(payload.__monthTemplate));
 
-  // Fill base months ONLY from DB rows
+  // ✅ Fill base months ONLY from DB rows
   for(const r of (rows || [])){
     const iso = r.job_date; // 'YYYY-MM-DD'
     if(!iso) continue;
+
     const mid = String(parseInt(iso.slice(5,7), 10));
     if(!payload._baseMonths[mid]) continue;
 
@@ -338,13 +343,16 @@ async function dbBootstrapJobsIntoPayload(){
     payload._baseMonths[mid].date_index[iso].push(it);
   }
 
-  // Also clear rendered months cache so rebuildMonthsFromOverrides starts clean
+  // ✅ Clear rendered months cache so rebuildMonthsFromOverrides starts clean
   if(payload.months){
     for(const mid of Object.keys(payload.months)){
       if(payload.months[mid]) payload.months[mid].date_index = {};
     }
   }
+
+  console.log("[dbBootstrapJobsIntoPayload] bootstrapped rows:", (rows||[]).length);
 }
+
 
 
 
@@ -2108,11 +2116,16 @@ function clearPlageOverride(key){ delete plageOverrides[key]; saveOverrides(); }
 function setDateOverride(key, iso){ dateOverrides[key] = iso; saveOverrides(); }
 function clearDateOverride(key){ delete dateOverrides[key]; saveOverrides(); }
 
-// Keep an immutable base copy of months so we can rebuild after overrides
-if(!payload._baseMonths){
-  // base months from embedded payload
-  payload._baseMonths = JSON.parse(JSON.stringify(payload.months));
+// Keep an immutable TEMPLATE of months (structure only) for DB bootstrap
+if (!payload.__monthTemplate) {
+  payload.__monthTemplate = JSON.parse(JSON.stringify(payload.months));
 }
+
+// Base months: start from template (will be filled by DB when logged-in)
+if (!payload._baseMonths) {
+  payload._baseMonths = JSON.parse(JSON.stringify(payload.__monthTemplate));
+}
+
 // If user has a saved baseMonths snapshot, use it (LOCAL MODE ONLY)
 if(!window.USE_DB_JOBS){
   try{
