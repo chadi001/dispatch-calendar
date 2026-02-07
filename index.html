@@ -1,3 +1,4 @@
+
 <!doctype html><html lang="en"><head><meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Dispatch Calendar (v1.9)</title>
@@ -215,33 +216,30 @@ button.reset:hover{background:#f6f8ff;}
   if (!user) return [];
 
   // tech_name for this user
-  // tech_code for this user (from tech_profiles)
-const { data: profile, error: mapErr } = await window.sb
-  .from("tech_profiles")
-  .select("tech_code")
-  .eq("user_id", user.id)
-  .eq("is_active", true)
-  .maybeSingle();
+  const { data: mapRow, error: mapErr } = await window.sb
+    .from("tech_name_map")
+    .select("tech_name")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .maybeSingle();
 
-console.log("[dbLoadJobs] tech_profiles:", profile, "err:", mapErr);
+  console.log("[dbLoadJobs] tech_name_map:", mapRow, "err:", mapErr);
 
-if (mapErr) throw mapErr;
+  if (mapErr) throw mapErr;
 
-const myTechCode = profile?.tech_code;
-if (!myTechCode) {
-// IMPORTANT: if you have no mapping, DO NOT show anything (prevents “all jobs”)
-  console.warn("[dbLoadJobs] No tech profile mapping for this user_id:", user.id);
-  return [];
-}
-
+  const myTechName = mapRow?.tech_name;
+  if (!myTechName) {
+    // IMPORTANT: if you have no mapping, DO NOT show anything (prevents “all jobs”)
+    console.warn("[dbLoadJobs] No tech_name mapping for this user_id:", user.id);
+    return [];
+  }
 
   // Load only jobs for that tech
   const { data, error } = await window.sb
     .from("v_jobs_calendar")
     .select("*")
     .eq("cancelled", false)
-    .eq("resolved_tech", myTechCode);
-
+    .eq("resolved_tech", myTechName);
 
   console.log("[dbLoadJobs] filter resolved_tech =", myTechName, "rows:", data?.length, "err:", error);
 
@@ -317,19 +315,37 @@ function jobRowToPayloadItem(r){
 async function dbBootstrapJobsIntoPayload(){
   const rows = await dbLoadJobs();
 
-  // ✅ THIS is the important line
-  resetCalendarKeepShape();
+  // DB is the ONLY source of jobs -> rebuild base months from a clean template
+  if(!window.payload || !payload.__monthTemplate){
+    console.warn("[dbBootstrapJobsIntoPayload] missing payload template");
+    return;
+  }
 
+  // Start from EMPTY template (structure only)
+  payload._baseMonths = JSON.parse(JSON.stringify(payload.__monthTemplate));
+
+  // Fill base months ONLY from DB rows
   for(const r of (rows || [])){
-    const iso = r.job_date;
+    const iso = r.job_date; // 'YYYY-MM-DD'
     if(!iso) continue;
+    const mid = String(parseInt(iso.slice(5,7), 10));
+    if(!payload._baseMonths[mid]) continue;
 
     const it = jobRowToPayloadItem(r);
 
-    // ✅ Only write to base months
-    addJobToBaseMonths(it, iso);
+    payload._baseMonths[mid].date_index = payload._baseMonths[mid].date_index || {};
+    payload._baseMonths[mid].date_index[iso] = payload._baseMonths[mid].date_index[iso] || [];
+    payload._baseMonths[mid].date_index[iso].push(it);
+  }
+
+  // Also clear rendered months cache so rebuildMonthsFromOverrides starts clean
+  if(payload.months){
+    for(const mid of Object.keys(payload.months)){
+      if(payload.months[mid]) payload.months[mid].date_index = {};
+    }
   }
 }
+
 
 
 
@@ -615,6 +631,15 @@ function ensureTechColors(){
   }
 }
 ensureTechColors();
+
+// ---- Clean month template (structure only, NO jobs) ----
+if(!payload.__monthTemplate){
+  payload.__monthTemplate = JSON.parse(JSON.stringify(payload.months || {}));
+  for(const mid of Object.keys(payload.__monthTemplate)){
+    if(payload.__monthTemplate[mid]) payload.__monthTemplate[mid].date_index = {};
+  }
+}
+
 
 
 // If we are using DB jobs, do NOT inject local manual jobs
@@ -1394,8 +1419,10 @@ function addJobToBaseMonths(job, iso){
   if(!m.date_index) m.date_index = {};
   if(!m.date_index[iso]) m.date_index[iso] = [];
   m.date_index[iso].push(job);
-  // persist base months snapshot
-  try{ localStorage.setItem('dispatch_base_months_v1', JSON.stringify(payload._baseMonths)); }catch(e){}
+  // persist base months snapshot (LOCAL MODE ONLY)
+  if(!window.USE_DB_JOBS){
+    try{ localStorage.setItem('dispatch_base_months_v1', JSON.stringify(payload._baseMonths)); }catch(e){}
+  }
 }
 function exportJobsCsv(){
   rebuildMonthsFromOverrides();
@@ -2086,12 +2113,13 @@ if(!payload._baseMonths){
   // base months from embedded payload
   payload._baseMonths = JSON.parse(JSON.stringify(payload.months));
 }
-// If user has a saved baseMonths snapshot, use it
-try{
-  const saved = localStorage.getItem('dispatch_base_months_v1');
-  if(saved){ payload._baseMonths = JSON.parse(saved); }
-}catch(e){}
-
+// If user has a saved baseMonths snapshot, use it (LOCAL MODE ONLY)
+if(!window.USE_DB_JOBS){
+  try{
+    const saved = localStorage.getItem('dispatch_base_months_v1');
+    if(saved){ payload._baseMonths = JSON.parse(saved); }
+  }catch(e){}
+}
 function rebuildMonthsFromOverrides(){
   // We rebuild from BASE months each time, applying date + tech + AM/PM overrides.
   const baseAll = JSON.parse(JSON.stringify(payload._baseMonths));
@@ -2286,6 +2314,25 @@ initApp().catch(err=>{
   // ✅ Run-once guard (important)
   window.__DB_BOOTSTRAPPED = false; // always bootstrap once per page load
 
+  // DB mode must ignore embedded/local jobs. Build clean months from template.
+  function __enterDbModeClean(){
+    __enterDbModeClean();
+
+    // wipe any local snapshot (prevents refresh pollution)
+    try{ localStorage.removeItem('dispatch_base_months_v1'); }catch(e){}
+
+    // ensure template exists
+    if(!window.payload || !payload.__monthTemplate){
+      console.warn("[__enterDbModeClean] missing payload template");
+      return;
+    }
+
+    // reset rendered months + base months to EMPTY structure
+    payload.months = JSON.parse(JSON.stringify(payload.__monthTemplate));
+    payload._baseMonths = JSON.parse(JSON.stringify(payload.__monthTemplate));
+  }
+
+
 
   async function doLogin(e) {
     if (e) e.preventDefault();
@@ -2318,7 +2365,7 @@ initApp().catch(err=>{
     $("logoutBox").style.display = "block";
     $("appContent").style.display = "block";
 
-    window.USE_DB_JOBS = true;
+    __enterDbModeClean();
 
    try {
     if (!window.__DB_BOOTSTRAPPED) {
@@ -2374,6 +2421,8 @@ buildUIFromPayload();
       $("btnLogout")?.addEventListener("click", async () => {
       await window.sb.auth.signOut();
       window.__DB_BOOTSTRAPPED = false; // ✅ allow bootstrap next login
+      window.USE_DB_JOBS = false;
+      try{ localStorage.removeItem('dispatch_base_months_v1'); }catch(e){}
   
 
       $("authStatus").textContent = "Not signed in";
