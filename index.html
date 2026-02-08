@@ -235,7 +235,9 @@ button.reset:hover{background:#f6f8ff;}
 <script>
   // HELPER FIRST
  // const __DUAL_WRITE_MONTHS = true; // set to false if you see duplicate jobs
- 
+  window.IS_ADMIN = false;
+  window.CAN_EDIT = false; // admin only
+
   window.__DB_BOOTSTRAPPED = window.__DB_BOOTSTRAPPED || false;
 
 
@@ -960,6 +962,9 @@ function openDrawer(drawer, title, items, iso){
     const actionsS = document.createElement('div');
     actionsS.className='edactions';
     const btnCancel = document.createElement('button');
+
+
+    
     btnCancel.type='button';
     btnCancel.className='edbtn ' + (isCancelled ? 'secondary' : '');
     btnCancel.textContent = isCancelled ? 'Restore' : 'Cancel';
@@ -1002,16 +1007,34 @@ function openDrawer(drawer, title, items, iso){
     const actionsA = document.createElement('div');
     actionsA.className='edactions';
 
-    const applyAll = document.createElement('button');
-    applyAll.type='button';
-    applyAll.className='edbtn';
-    applyAll.textContent='Apply changes';
+  const applyAll = document.createElement('button');
+  applyAll.type='button';
+  applyAll.className='edbtn';
+  applyAll.textContent='Apply changes';
 
-    const resetAll = document.createElement('button');
-    resetAll.type='button';
-    resetAll.className='edbtn secondary';
-    resetAll.textContent='Reset changes';
+  const resetAll = document.createElement('button');
+  resetAll.type='button';
+  resetAll.className='edbtn secondary';
+  resetAll.textContent='Reset changes';
 
+// ✅ INSERT THIS BLOCK HERE
+if(!window.CAN_EDIT){
+  techSel.disabled = true;
+  plageSel.disabled = true;
+  dateInp.disabled = true;
+
+  applyAll.disabled = true;
+  resetAll.disabled = true;
+
+  btnCancel.disabled = true;
+
+  // Option A (recommended): hide edit panel completely
+  controls.style.display = "none";
+}
+
+// keep your onclicks (they won’t be reachable when hidden/disabled)
+
+    
     applyAll.onclick = ()=>{
       setManualLock(k);
 
@@ -2510,14 +2533,15 @@ async function doLogin(e) {
     }
 
     $("authStatus").textContent = "Signed in as: " + email;
-$("loginForm").style.display = "none";
-$("logoutBox").style.display = "block";
-$("appContent").style.display = "block";
+    $("loginForm").style.display = "none";
+    $("logoutBox").style.display = "block";
+    $("appContent").style.display = "block";
 
-window.USE_DB_JOBS = true;                 // ✅ ADD
-window.IS_ADMIN = await dbIsAdmin();       // ✅ ADD (must be AFTER sign-in)
-
-__enterDbModeClean();
+    window.USE_DB_JOBS = true;                 // ✅ ADD
+    window.IS_ADMIN = await dbIsAdmin();       // ✅ ADD (must be AFTER sign-in)
+    window.CAN_EDIT = window.IS_ADMIN;
+    
+    __enterDbModeClean();
 
 try {
   if (!window.__DB_BOOTSTRAPPED) {
@@ -2547,7 +2571,7 @@ if (window.paintBuildBadge) window.paintBuildBadge();
 
     window.USE_DB_JOBS = true;
     window.IS_ADMIN = await dbIsAdmin();       // ✅ ADD
-
+    window.CAN_EDIT = window.IS_ADMIN;
     __enterDbModeClean();                      // ✅ ADD (recommended for consistency)
 
     try {
