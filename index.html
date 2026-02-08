@@ -1037,6 +1037,10 @@ if(!window.CAN_EDIT){
     
     applyAll.onclick = ()=>{
       setManualLock(k);
+      if(!window.CAN_EDIT){
+        alert("Admin only");
+        return;
+      }
 
       // Tech
       if(techSel.value === it.tech){ clearTechOverride(k); } else { setTechOverride(k, techSel.value); }
@@ -1077,6 +1081,11 @@ if(!window.CAN_EDIT){
       clearPlageOverride(k);
       clearDateOverride(k);
       rerenderActive();
+      if(!window.CAN_EDIT){
+        alert("Admin only");
+        return;
+      }
+
       try{
         const refreshed = itemsForDate(iso);
         openDrawer(drawer, `Jobs for ${iso} (${refreshed.length})`, refreshed, iso);
@@ -2396,6 +2405,32 @@ function buildUIFromPayload(){
   renderKpis();
   wireHandlers();
 }
+  
+  function setEditModeUI(){
+  const can = !!window.CAN_EDIT;
+
+  // boutons d'édition (ajuste la liste si tu en as plus)
+  const ids = [
+    "btnAddJob",
+    "btnImportJobsCsv",
+    "btnImportOverridesJson",
+    "btnImportAllJson"
+  ];
+
+  ids.forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.disabled = !can;
+    el.style.opacity = can ? "1" : "0.45";
+    el.style.pointerEvents = can ? "auto" : "none";
+    if(!can) el.title = "Admin only";
+  });
+
+  // si tu as un panneau d'édition, tu peux aussi le cacher:
+  // const panel = document.getElementById("adminPanel");
+  // if(panel) panel.style.display = can ? "block" : "none";
+}
+
 
 async function initApp(){
   try{ __dbBootstrap = true; }catch(e){}
@@ -2553,6 +2588,7 @@ try {
 }
 console.log("ROLE:", { USE_DB_JOBS: window.USE_DB_JOBS, IS_ADMIN: window.IS_ADMIN });
 buildUIFromPayload();
+setEditModeUI();
 if (window.paintBuildBadge) window.paintBuildBadge();
 
   }
@@ -2585,6 +2621,7 @@ if (window.paintBuildBadge) window.paintBuildBadge();
 console.log("ROLE:", { USE_DB_JOBS: window.USE_DB_JOBS, IS_ADMIN: window.IS_ADMIN });
 
 buildUIFromPayload();
+setEditModeUI();
 if (window.paintBuildBadge) window.paintBuildBadge();
 
   }
