@@ -181,10 +181,13 @@ button.reset:hover{background:#f6f8ff;}
 
   <!-- BUILD MARKER + SUPABASE INIT (FIRST INLINE SCRIPT) -->
 <script>
-  console.log("Dispatch Calendar build: 2026-02-04-01");
-  window.APP_BUILD = "2026-02-04-01";
+  
+  const build = new Date().toISOString().replace(/[:T]/g, "-").slice(0, 16);
+  window.APP_BUILD = build;
+  document.title = `Dispatch Calendar (${build})`;
+  console.log("Dispatch Calendar build:", build);
 
-  document.title = "Dispatch Calendar (2026-02-04-01)";
+
   
   window.SUPABASE_URL = "https://mycgdissxzsizoywcwps.supabase.co";
   window.SUPABASE_ANON_KEY =
