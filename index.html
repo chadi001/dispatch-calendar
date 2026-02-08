@@ -376,16 +376,18 @@ function resetCalendarKeepShape(){
 function jobRowToPayloadItem(r){
   // Prefer the most complete / reliable address field available
   const dest =
+    (r.destination_display || '').trim() ||
     (r.full_address || '').trim() ||
     (r.destination  || '').trim() ||
-    (r.address      || '').trim() ||
     (r.street_address || '').trim() ||
-    // last resort: try to build from pieces if present
+    (r.address      || '').trim() ||
+    // last resort: build from pieces if present
     [r.address, r.city, r.province, r.postal_code].filter(Boolean).join(', ').trim() ||
     '';
 
   // Prefer best map link field available
   const mapUrl =
+    (r.map_url_display || '').trim() ||
     (r.map_url || '').trim() ||
     (r.google_maps_link || '').trim() ||
     (r.url || '').trim() ||
