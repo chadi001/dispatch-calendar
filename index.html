@@ -183,21 +183,25 @@ button.reset:hover{background:#f6f8ff;}
 <script>
   
 
+  // build id
   const build = new Date().toISOString().replace(/[:T]/g, "-").slice(0, 16);
   window.APP_BUILD = build;
   document.title = `Dispatch Calendar (${build})`;
   console.log("Dispatch Calendar build:", build);
 
-  // show on page
-  function paintBuild(){
+  // ✅ global painter so we can call it after UI rebuild
+  window.paintBuildBadge = function () {
     const el = document.getElementById("buildBadge");
-    if (el) el.textContent = "Build: " + build;
-  }
+    if (el) el.textContent = "Build: " + window.APP_BUILD;
+  };
+
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", paintBuild);
+    document.addEventListener("DOMContentLoaded", window.paintBuildBadge);
   } else {
-    paintBuild();
+    window.paintBuildBadge();
   }
+
+
 
 
 
@@ -477,10 +481,10 @@ function scheduleSaveOverridesToDB(){
   <body>
 <h2 style="display:flex;align-items:center;gap:10px;">
   <span>Dispatch Calendar</span>
-  <span id="buildBadge"
-        style="font-size:12px;color:#6b7280;background:#f3f4f6;border:1px solid #e5e7eb;padding:2px 8px;border-radius:999px;">
-    Build: —
-  </span>
+ <span id="buildBadge"
+      style="font-size:12px;color:#6b7280;background:#f3f4f6;border:1px solid #e5e7eb;padding:2px 8px;border-radius:999px;">
+  Build: (loading…)
+</span>
 </h2>
 
    <div id="authBox" style="border:1px solid #ddd; padding:12px; border-radius:10px; max-width:420px; margin:10px 0;">
@@ -2496,7 +2500,7 @@ try {
 }
 console.log("ROLE:", { USE_DB_JOBS: window.USE_DB_JOBS, IS_ADMIN: window.IS_ADMIN });
 buildUIFromPayload();
-
+if (window.paintBuildBadge) window.paintBuildBadge();
 
   }
 
@@ -2528,7 +2532,7 @@ buildUIFromPayload();
 console.log("ROLE:", { USE_DB_JOBS: window.USE_DB_JOBS, IS_ADMIN: window.IS_ADMIN });
 
 buildUIFromPayload();
-
+if (window.paintBuildBadge) window.paintBuildBadge();
 
   }
 
