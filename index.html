@@ -374,19 +374,37 @@ function resetCalendarKeepShape(){
 
 
 function jobRowToPayloadItem(r){
+  // Prefer the most complete / reliable address field available
+  const dest =
+    (r.full_address || '').trim() ||
+    (r.destination  || '').trim() ||
+    (r.address      || '').trim() ||
+    (r.street_address || '').trim() ||
+    // last resort: try to build from pieces if present
+    [r.address, r.city, r.province, r.postal_code].filter(Boolean).join(', ').trim() ||
+    '';
+
+  // Prefer best map link field available
+  const mapUrl =
+    (r.map_url || '').trim() ||
+    (r.google_maps_link || '').trim() ||
+    (r.url || '').trim() ||
+    '';
+
   return {
-    client: r.client || '',
-    site: r.prov_site || r.site || '',
-    wo: r.order_number || '',
+    client: r.client || r.client_name || '',
+    site: r.prov_site || r.site_name || r.site || '',
+    wo: r.order_number || r.wo || '',
     province: r.province || '',
-    region: r.region || '',
-    destination: r.address || '',
-    url: r.google_maps_link || '',
-    plage: r.slot || '',
+    region: r.region || r.admin_region || '',
+    destination: dest,
+    url: mapUrl,
+    plage: r.slot || r.plage || '',
     tech: r.effective_tech || r.resolved_tech || r.tech_name || 'UNASSIGNED',
     _db_id: r.id
   };
 }
+
 
 async function dbBootstrapJobsIntoPayload(){
   const rows = await dbLoadJobs();
