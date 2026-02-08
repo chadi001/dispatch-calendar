@@ -2469,7 +2469,7 @@ try {
 } catch (err) {
   console.warn("DB bootstrap failed:", err);
 }
-
+console.log("ROLE:", { USE_DB_JOBS: window.USE_DB_JOBS, IS_ADMIN: window.IS_ADMIN });
 buildUIFromPayload();
 
 
@@ -2500,6 +2500,7 @@ buildUIFromPayload();
 } catch (err) {
   console.warn("Session restore bootstrap failed:", err);
 }
+console.log("ROLE:", { USE_DB_JOBS: window.USE_DB_JOBS, IS_ADMIN: window.IS_ADMIN });
 
 buildUIFromPayload();
 
