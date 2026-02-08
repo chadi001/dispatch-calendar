@@ -201,12 +201,6 @@ button.reset:hover{background:#f6f8ff;}
     window.paintBuildBadge();
   }
 
-
-
-
-
-
-  
   window.SUPABASE_URL = "https://mycgdissxzsizoywcwps.supabase.co";
   window.SUPABASE_ANON_KEY =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15Y2dkaXNzeHpzaXpveXdjd3BzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxNzkyNDEsImV4cCI6MjA4NTc1NTI0MX0.1-3qDwNwFeqlHjn-jCACOtV5U2yhgEsQ1yUM-m2TKZg";
@@ -219,6 +213,21 @@ button.reset:hover{background:#f6f8ff;}
   window.USE_DB_JOBS = false; // default: do NOT use DB until signed in
 
 
+</script>
+<script>
+  function paintBuildBadge(){
+    const el = document.getElementById("buildBadge");
+    if(!el) return;
+    const v = window.APP_BUILD || "(no build)";
+    el.textContent = "Build: " + v;
+  }
+
+  // Run now + after DOM is ready
+  paintBuildBadge();
+  document.addEventListener("DOMContentLoaded", paintBuildBadge);
+
+  // Optional: expose for manual calls after UI rebuilds
+  window.paintBuildBadge = paintBuildBadge;
 </script>
 
 
@@ -507,7 +516,7 @@ function scheduleSaveOverridesToDB(){
 
 
 <p class="small">
-This App is for Aigle Info Inc.
+<b>This App is built for Aigle Info Inc. Activities</b><br/>
 Office: <b>4741 Boulevard des Laurentides #204, Laval, Quebec H7K 2Z6</b><br/>
 Tech priority: <b>Adil</b> → <b>Abdel</b>. Capacity: 1 AM + 1 PM per tech/day.
 </p>
