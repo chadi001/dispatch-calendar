@@ -2407,7 +2407,24 @@ initApp().catch(err=>{
       }
     }
   }
+async function dbIsAdmin() {
+  const { data: { user } } = await window.sb.auth.getUser();
+  if (!user) return false;
 
+  const { data, error } = await window.sb
+    .from("admin_users")
+    .select("user_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (error) {
+    console.warn("[dbIsAdmin] error:", error);
+    return false;
+  }
+  return !!data;
+}
+
+  
 async function doLogin(e) {
     if (e) e.preventDefault();
 
@@ -2435,22 +2452,26 @@ async function doLogin(e) {
     }
 
     $("authStatus").textContent = "Signed in as: " + email;
-    $("loginForm").style.display = "none";
-    $("logoutBox").style.display = "block";
-    $("appContent").style.display = "block";
+$("loginForm").style.display = "none";
+$("logoutBox").style.display = "block";
+$("appContent").style.display = "block";
 
-    __enterDbModeClean();
+window.USE_DB_JOBS = true;                 // ✅ ADD
+window.IS_ADMIN = await dbIsAdmin();       // ✅ ADD (must be AFTER sign-in)
 
-   try {
-    if (!window.__DB_BOOTSTRAPPED) {
-      window.__DB_BOOTSTRAPPED = true;
-      await dbBootstrapJobsIntoPayload();
-    }
-  } catch (err) {
-    console.warn("DB bootstrap failed:", err);
+__enterDbModeClean();
+
+try {
+  if (!window.__DB_BOOTSTRAPPED) {
+    window.__DB_BOOTSTRAPPED = true;
+    await dbBootstrapJobsIntoPayload();
   }
+} catch (err) {
+  console.warn("DB bootstrap failed:", err);
+}
 
 buildUIFromPayload();
+
 
   }
 
@@ -2467,17 +2488,21 @@ buildUIFromPayload();
     $("appContent").style.display = "block";
 
     window.USE_DB_JOBS = true;
+    window.IS_ADMIN = await dbIsAdmin();       // ✅ ADD
 
-   try {
-    if (!window.__DB_BOOTSTRAPPED) {
-      window.__DB_BOOTSTRAPPED = true;
-      await dbBootstrapJobsIntoPayload();
+    __enterDbModeClean();                      // ✅ ADD (recommended for consistency)
+
+    try {
+      if (!window.__DB_BOOTSTRAPPED) {
+        window.__DB_BOOTSTRAPPED = true;
+        await dbBootstrapJobsIntoPayload();
     }
-  } catch (err) {
-    console.warn("Session restore bootstrap failed:", err);
-  }
+} catch (err) {
+  console.warn("Session restore bootstrap failed:", err);
+}
 
-  buildUIFromPayload();
+buildUIFromPayload();
+
 
   }
 
@@ -2496,6 +2521,8 @@ buildUIFromPayload();
       await window.sb.auth.signOut();
       window.__DB_BOOTSTRAPPED = false; // ✅ allow bootstrap next login
       window.USE_DB_JOBS = false;
+      window.IS_ADMIN = false;                   // ✅ ADD
+      window.__ENTER_DB_MODE_DONE = false;       // ✅ ADD (so a new login can clean again)
       try{ localStorage.removeItem('dispatch_base_months_v1'); }catch(e){}
   
 
