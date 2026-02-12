@@ -969,10 +969,15 @@ function openDrawer(drawer, title, items, iso){
     btnCancel.className='edbtn ' + (isCancelled ? 'secondary' : '');
     btnCancel.textContent = isCancelled ? 'Restore' : 'Cancel';
     btnCancel.onclick = ()=>{
-      setManualLock(k);
-      if(isCancelled){ delete cancelOverrides[k]; } else { cancelOverrides[k]=true; }
-      saveOverrides();
-      rerenderActive();
+     if(!window.CAN_EDIT){
+        alert("Admin only");
+        return;
+    }
+
+    setManualLock(k);
+    if(isCancelled){ delete cancelOverrides[k]; } else { cancelOverrides[k]=true; }
+    saveOverrides();
+    rerenderActive();
       try{ const refreshed = itemsForDate(iso); openDrawer(drawer, `Jobs for ${iso} (${refreshed.length})`, refreshed, iso); }catch(e){}
     };
     actionsS.appendChild(btnCancel);
@@ -1036,12 +1041,12 @@ if(!window.CAN_EDIT){
 
     
     applyAll.onclick = ()=>{
-      setManualLock(k);
+      
       if(!window.CAN_EDIT){
         alert("Admin only");
         return;
       }
-
+      setManualLock(k);
       // Tech
       if(techSel.value === it.tech){ clearTechOverride(k); } else { setTechOverride(k, techSel.value); }
       // AM/PM
@@ -1076,15 +1081,16 @@ if(!window.CAN_EDIT){
     };
 
     resetAll.onclick = ()=>{
+     if(!window.CAN_EDIT){
+        alert("Admin only");
+        return;
+      }
       clearManualLock(k);
       clearTechOverride(k);
       clearPlageOverride(k);
       clearDateOverride(k);
       rerenderActive();
-      if(!window.CAN_EDIT){
-        alert("Admin only");
-        return;
-      }
+      
 
       try{
         const refreshed = itemsForDate(iso);
@@ -2431,7 +2437,60 @@ function buildUIFromPayload(){
   // if(panel) panel.style.display = can ? "block" : "none";
 }
 
+function setEditModeUI(){
+  const isAdmin = !!window.IS_ADMIN;
+  const canEdit = !!window.CAN_EDIT;
 
+  // ---- Hide entire admin-only controls ----
+  const hideIds = [
+    // tech selection area
+    "techAll", "techClear", "techChecks",
+
+    // import/export/admin tools
+    "btnExportMonthCsv", "btnOpenMyMaps",
+    "btnExportOverridesJson", "btnImportOverridesJson",
+    "btnExportJobsCsv", "btnImportJobsCsv",
+    "btnExportAllJson", "btnImportAllJson",
+    "btnAddJob",
+
+    // file inputs for imports
+    "fileImportOverrides", "fileImportJobsCsv", "fileImportAll",
+
+    // add-job modal controls (in case modal opened by shortcut)
+    "btnCloseAddJob", "btnAddJobCancel", "btnAddJobConfirm",
+    "aj_client","aj_site","aj_wo","aj_province","aj_city","aj_address","aj_date","aj_plage","aj_tech","aj_keepOpen"
+  ];
+
+  hideIds.forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.style.display = isAdmin ? "" : "none";
+  });
+
+  // ---- Keep filters visible (region/problems/showCancelled/reset/search) ----
+  // regionFilter, problemsOnly, showCancelled, resetBtn, orderSearchQuick, btnOrderSearchGo stay visible.
+
+  // ---- Hard-disable anything that remains clickable but should be admin only ----
+  const disableIds = [
+    "btnAddJob",
+    "btnImportOverridesJson","btnImportJobsCsv","btnImportAllJson"
+  ];
+  disableIds.forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.disabled = !canEdit;
+    el.style.opacity = canEdit ? "1" : "0.45";
+    el.style.pointerEvents = canEdit ? "auto" : "none";
+    if(!canEdit) el.title = "Admin only";
+  });
+
+  // ---- Make the drawer read-only for techs ----
+  // We don't have stable IDs for apply/reset buttons because they are created dynamically.
+  // So we mark a global flag and block actions inside handlers (see step 2 below).
+}
+
+
+  
 async function initApp(){
   try{ __dbBootstrap = true; }catch(e){}
 
