@@ -2095,40 +2095,44 @@ function renderOrderResults(list){
 }
   // ✅ DB/Payload-aware search (works with payload.months)
 window.runOrderSearch = function runOrderSearch() {
-  const q = (document.getElementById("orderSearchInput")?.value || "").trim();
+  const q =
+    (document.getElementById("orderSearchQuick")?.value || "").trim() ||
+    (document.getElementById("orderSearchInput")?.value || "").trim();
+
+  console.log("[runOrderSearch] q =", q);
+
   if (!q) {
     if (window.renderOrderResults) window.renderOrderResults([]);
     return;
   }
 
-  const months = (window.payload && window.payload.months) ? window.payload.months : {};
+  const sources = [];
+  if (window.payload?._baseMonths) sources.push({ name: "_baseMonths", months: window.payload._baseMonths });
+  if (window.payload?.months)      sources.push({ name: "months",      months: window.payload.months });
+
   const hits = [];
+  for (const src of sources) {
+    const months = src.months || {};
+    for (const mid of Object.keys(months)) {
+      const di = months[mid]?.date_index || {};
+      for (const iso of Object.keys(di)) {
+        for (const it of (di[iso] || [])) {
+          const wo = String(it.wo || "").trim();
+          const site = String(it.site || "").trim();
+          const client = String(it.client || "").trim();
+          const tech = String(it.tech || "").trim();
+          const dest = String(it.destination || "").trim();
 
-  for (const mid of Object.keys(months)) {
-    const m = months[mid];
-    const di = m?.date_index || {};
-    for (const iso of Object.keys(di)) {
-      for (const it of (di[iso] || [])) {
-        const wo = String(it.wo || "").trim();
-        const site = String(it.site || "").trim();
-        const client = String(it.client || "").trim();
-        const tech = String(it.tech || "").trim();
-        const dest = String(it.destination || "").trim();
-
-        // match on WO OR partial match in key fields
-        const hay = (wo + " " + site + " " + client + " " + tech + " " + dest).toLowerCase();
-        if (hay.includes(q.toLowerCase())) {
-          hits.push({ ...it, iso, _mid: mid });
+          const hay = (wo + " " + site + " " + client + " " + tech + " " + dest).toLowerCase();
+          if (hay.includes(q.toLowerCase())) hits.push({ ...it, iso, _mid: mid, _src: src.name });
         }
       }
     }
   }
 
-  // newest first
-  hits.sort((a, b) => String(a.iso).localeCompare(String(b.iso)));
+  console.log("[runOrderSearch] hits =", hits.length, hits.slice(0, 10));
 
   if (window.renderOrderResults) window.renderOrderResults(hits);
-  else console.log("[runOrderSearch] hits:", hits.length, hits.slice(0, 20));
 };
 
 
