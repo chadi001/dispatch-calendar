@@ -139,22 +139,14 @@ button.reset:hover{background:#f6f8ff;}
 .edbtn.secondary{opacity:.8}
 
 
-/* --- Modal (Add Job) --- */
-.modal{position:fixed; inset:0; z-index:9999; font-family:inherit;}
-.modal-backdrop{position:absolute; inset:0; background:rgba(0,0,0,.35);}
-.modal-card{position:relative; margin:4vh auto; max-width:760px; width:calc(100% - 24px); background:#fff; border-radius:14px; box-shadow:0 18px 60px rgba(0,0,0,.25); overflow:hidden;}
-.modal-header{display:flex; justify-content:space-between; gap:12px; padding:14px 16px; border-bottom:1px solid #eee; align-items:flex-start;}
-.modal-title{font-size:18px; font-weight:700;}
-.modal-subtitle{font-size:12px; opacity:.75; margin-top:2px;}
-.modal-body{padding:14px 16px;}
-.modal-footer{display:flex; justify-content:flex-end; gap:10px; padding:12px 16px; border-top:1px solid #eee;}
-.grid2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
-.grid2 label{display:flex; flex-direction:column; font-size:12px; gap:6px;}
-.grid2 input, .grid2 select{padding:8px 10px; border:1px solid #ddd; border-radius:10px; font-size:13px;}
-.span2{grid-column:1 / span 2;}
-.note{font-size:12px; opacity:.75;}
-.req{color:#c00; font-weight:700;}
-@media (max-width:680px){ .grid2{grid-template-columns:1fr;} .span2{grid-column:auto;} .modal-card{margin:2vh auto;} }
+/* Modal Add Job - merged with generic modal */
+.modal-card{position:relative;margin:4vh auto;max-width:760px;width:calc(100% - 24px);background:#fff;border-radius:14px;box-shadow:0 18px 60px rgba(0,0,0,.25);overflow:hidden}
+.modal-title{font-size:18px}.modal-subtitle{font-size:12px;opacity:.75;margin-top:2px}
+.modal-body{padding:14px 16px}.modal-footer{padding:12px 16px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid2 label{font-size:12px}.grid2 input,.grid2 select{padding:8px 10px;border:1px solid #ddd;border-radius:10px;font-size:13px}
+.span2{grid-column:1 / span 2}.note{font-size:12px;opacity:.75}.req{color:#c00}
+@media (max-width:680px){.grid2{grid-template-columns:1fr}.span2{grid-column:auto}}
 
 
 /* client badge (weekly drawer) */
@@ -176,8 +168,21 @@ button.reset:hover{background:#f6f8ff;}
 #orderSearchQuick:focus{outline:none;border-color:#93c5fd;box-shadow:0 0 0 3px rgba(147,197,253,.35)}
 
 </style> 
-<!-- Supabase client -->
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<!-- Supabase client with CDN fallback -->
+<script>
+(function(){
+  var s=document.createElement('script');
+  s.src='https://unpkg.com/@supabase/supabase-js@2';
+  s.onerror=function(){
+    console.warn('unpkg failed, trying jsdelivr...');
+    var s2=document.createElement('script');
+    s2.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+    s2.onerror=function(){alert('Failed to load Supabase. Check internet connection.');};
+    document.head.appendChild(s2);
+  };
+  document.head.appendChild(s);
+})();
+</script>
 
   <!-- BUILD MARKER + SUPABASE INIT (FIRST INLINE SCRIPT) -->
 <script>
@@ -205,30 +210,28 @@ button.reset:hover{background:#f6f8ff;}
   window.SUPABASE_ANON_KEY =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15Y2dkaXNzeHpzaXpveXdjd3BzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxNzkyNDEsImV4cCI6MjA4NTc1NTI0MX0.1-3qDwNwFeqlHjn-jCACOtV5U2yhgEsQ1yUM-m2TKZg";
 
-  // Create ONCE even if this block appears twice
-  window.sb = window.sb || window.supabase.createClient(
-    window.SUPABASE_URL,
-    window.SUPABASE_ANON_KEY
-  );
-  window.USE_DB_JOBS = false; // default: do NOT use DB until signed in
+  // Initialize Supabase with error handling
+  (function initSupabase(){
+    if(!window.supabase){
+      setTimeout(initSupabase,100);
+      return;
+    }
+    try{
+      window.sb = window.supabase.createClient(
+        window.SUPABASE_URL,
+        window.SUPABASE_ANON_KEY
+      );
+      console.log('Supabase initialized');
+    }catch(e){
+      console.error('Supabase init failed:',e);
+      document.getElementById('authStatus').textContent='Error: Supabase failed to load';
+    }
+  })();
+  window.USE_DB_JOBS = false;
 
 
 </script>
-<script>
-  function paintBuildBadge(){
-    const el = document.getElementById("buildBadge");
-    if(!el) return;
-    const v = window.APP_BUILD || "(no build)";
-    el.textContent = "Build: " + v;
-  }
 
-  // Run now + after DOM is ready
-  paintBuildBadge();
-  document.addEventListener("DOMContentLoaded", paintBuildBadge);
-
-  // Optional: expose for manual calls after UI rebuilds
-  window.paintBuildBadge = paintBuildBadge;
-</script>
 
 
 
@@ -1556,18 +1559,26 @@ function autoAssignTech(iso, plage, cand){
 
   return 'UNASSIGNED';
 }
-function autoAssignTechAndPlage(iso){
+function autoAssignTechAndPlage(iso,cand){
   const arr=getDaySchedule(iso);
-  // Default: Adil gets AM then PM first
-  const PRIORITY = ["Adil","Abdel","Chadi","Tech A","Tech B"];
-
-  for(const tech of PRIORITY){
-    if(techCount(arr, tech) >= 2) continue;
-    if(!slotTaken(arr, tech, 'AM')) return {tech, plage:'AM'};
-    if(!slotTaken(arr, tech, 'PM')) return {tech, plage:'PM'};
+  const norm=s=>String(s||'').trim().toLowerCase();
+  const candReg=norm(cand&&(cand.region||(cand.raw&&cand.raw.city)));
+  if(candReg){
+    const adilJobs=arr.filter(x=>(x.tech||'')==='Adil');
+    if(adilJobs.length===1){
+      const r0=norm(adilJobs[0].region||(adilJobs[0].raw&&adilJobs[0].raw.city));
+      if(r0&&r0===candReg){
+        const other=((adilJobs[0].plage||'AM')==='AM')?'PM':'AM';
+        if(techCount(arr,'Adil')<2&&!slotTaken(arr,'Adil',other))return{tech:'Adil',plage:other}
+      }
+    }
   }
-
-  return {tech:'UNASSIGNED', plage:'AM'};
+  const byTech=countSlotsFor(iso);
+  const p1=firstFreePlage(byTech,'Adil');
+  if(p1)return{tech:'Adil',plage:p1};
+  const p2=firstFreePlage(byTech,'Abdel');
+  if(p2)return{tech:'Abdel',plage:p2};
+  return{tech:'UNASSIGNED',plage:'AM'};
 }
 function addJobToBaseMonths(job, iso){
   const mid=String(parseInt(iso.slice(5,7),10));
@@ -1824,34 +1835,6 @@ function firstFreePlage(byTech, tech){
   if(s.AM<1) return 'AM';
   if(s.PM<1) return 'PM';
   return null;
-}
-function autoAssignTechAndPlage(iso, cand){
-  // Optimize for Adil then Abdel.
-  // Additional rule: if Adil already has 1 job in the SAME region for that day (proxy for <=80km),
-  // then assign Adil the other slot (AM/PM) to keep both jobs together.
-  const arr=getDaySchedule(iso);
-  const norm=(s)=>String(s||'').trim().toLowerCase();
-  const candReg = norm(cand && (cand.region || (cand.raw && cand.raw.city)));
-  if(candReg){
-    const adilJobs = arr.filter(x => (x.tech||'')==='Adil');
-    if(adilJobs.length===1){
-      const r0 = norm(adilJobs[0].region || (adilJobs[0].raw && adilJobs[0].raw.city));
-      if(r0 && r0===candReg){
-        const other = ((adilJobs[0].plage||'AM')==='AM') ? 'PM' : 'AM';
-        if(techCount(arr,'Adil') < 2 && !slotTaken(arr,'Adil', other)){
-          return {tech:'Adil', plage:other};
-        }
-      }
-    }
-  }
-
-  rebuildMonthsFromOverrides();
-  const byTech = countSlotsFor(iso);
-  const p1 = firstFreePlage(byTech, 'Adil');
-  if(p1) return {tech:'Adil', plage:p1};
-  const p2 = firstFreePlage(byTech, 'Abdel');
-  if(p2) return {tech:'Abdel', plage:p2};
-  return {tech:'UNASSIGNED', plage:'AM'};
 }
 
 // Maps: always build Directions from HQ to destination
@@ -2427,31 +2410,6 @@ function buildUIFromPayload(){
   wireHandlers();
 }
   
-  function setEditModeUI(){
-  const can = !!window.CAN_EDIT;
-
-  // boutons d'édition (ajuste la liste si tu en as plus)
-  const ids = [
-    "btnAddJob",
-    "btnImportJobsCsv",
-    "btnImportOverridesJson",
-    "btnImportAllJson"
-  ];
-
-  ids.forEach(id=>{
-    const el = document.getElementById(id);
-    if(!el) return;
-    el.disabled = !can;
-    el.style.opacity = can ? "1" : "0.45";
-    el.style.pointerEvents = can ? "auto" : "none";
-    if(!can) el.title = "Admin only";
-  });
-
-  // si tu as un panneau d'édition, tu peux aussi le cacher:
-  // const panel = document.getElementById("adminPanel");
-  // if(panel) panel.style.display = can ? "block" : "none";
-}
-
 function setEditModeUI(){
   const isAdmin = !!window.IS_ADMIN;
   const canEdit = !!window.CAN_EDIT;
@@ -2471,7 +2429,7 @@ function setEditModeUI(){
     // file inputs for imports
     "fileImportOverrides", "fileImportJobsCsv", "fileImportAll",
 
-    // add-job modal controls (in case modal opened by shortcut)
+    // add-job modal controls
     "btnCloseAddJob", "btnAddJobCancel", "btnAddJobConfirm",
     "aj_client","aj_site","aj_wo","aj_province","aj_city","aj_address","aj_date","aj_plage","aj_tech","aj_keepOpen"
   ];
@@ -2483,9 +2441,6 @@ function setEditModeUI(){
   });
 
   // ---- Keep filters visible (region/problems/showCancelled/reset/search) ----
-  // regionFilter, problemsOnly, showCancelled, resetBtn, orderSearchQuick, btnOrderSearchGo stay visible.
-
-  // ---- Hard-disable anything that remains clickable but should be admin only ----
   const disableIds = [
     "btnAddJob",
     "btnImportOverridesJson","btnImportJobsCsv","btnImportAllJson"
@@ -2498,10 +2453,6 @@ function setEditModeUI(){
     el.style.pointerEvents = canEdit ? "auto" : "none";
     if(!canEdit) el.title = "Admin only";
   });
-
-  // ---- Make the drawer read-only for techs ----
-  // We don't have stable IDs for apply/reset buttons because they are created dynamically.
-  // So we mark a global flag and block actions inside handlers (see step 2 below).
 }
 
 
