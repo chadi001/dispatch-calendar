@@ -261,7 +261,7 @@ button.reset:hover{background:#f6f8ff;}
     if(auErr) console.warn("[dbLoadJobs] admin_users check err:", auErr);
     if(au?.user_id){
       const { data, error } = await window.sb
-        .from("v_jobs_calendar")
+        .from("jobs")
         .select("*")
         .eq("cancelled", false);
 
@@ -314,15 +314,14 @@ button.reset:hover{background:#f6f8ff;}
   }
 
   // 3) Load only jobs for that tech
-  // IMPORTANT: resolved_tech in v_jobs_calendar must match whatever myTech holds.
-  // For now, tech_name_map returns 'Abdel'/'Adil' which matches jobs.tech_name.
+  // IMPORTANT: tech_name in jobs table matches myTech
   const { data, error } = await window.sb
-    .from("v_jobs_calendar")
+    .from("jobs")
     .select("*")
     .eq("cancelled", false)
-    .eq("resolved_tech", myTech);
+    .eq("tech_name", myTech);
 
-  console.log("[dbLoadJobs] filter resolved_tech =", myTech, "rows:", data?.length, "err:", error);
+  console.log("[dbLoadJobs] filter tech_name =", myTech, "rows:", data?.length, "err:", error);
 
   if (error) throw error;
   return data || [];
