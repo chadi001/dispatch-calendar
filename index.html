@@ -2613,6 +2613,25 @@ try{ techOverrides  = JSON.parse(localStorage.getItem(techOverridesKey)  || '{}'
 try{ plageOverrides = JSON.parse(localStorage.getItem(plageOverridesKey) || '{}') || {}; }catch(e){ plageOverrides = {}; }
 try{ dateOverrides  = JSON.parse(localStorage.getItem(dateOverridesKey)  || '{}') || {}; }catch(e){ dateOverrides = {}; }
 
+// Override key schema migration (v2): keys now prefer DB ids to avoid collisions
+const overrideKeySchemaVersionKey = 'dispatch_override_key_schema_v';
+const overrideKeySchemaVersion = '2';
+try{
+  const prev = localStorage.getItem(overrideKeySchemaVersionKey);
+  if(prev !== overrideKeySchemaVersion){
+    techOverrides = {};
+    plageOverrides = {};
+    dateOverrides = {};
+    cancelOverrides = {};
+    localStorage.setItem(techOverridesKey, '{}');
+    localStorage.setItem(plageOverridesKey, '{}');
+    localStorage.setItem(dateOverridesKey, '{}');
+    localStorage.setItem(cancelOverridesKey, '{}');
+    localStorage.setItem(overrideKeySchemaVersionKey, overrideKeySchemaVersion);
+    console.log('[overrides] key schema migrated to v2 (cleared old override maps)');
+  }
+}catch(e){}
+
 function saveOverrides(){
   try{ localStorage.setItem(techOverridesKey,  JSON.stringify(techOverrides)); }catch(e){}
   try{ localStorage.setItem(plageOverridesKey, JSON.stringify(plageOverrides)); }catch(e){}
@@ -2623,11 +2642,14 @@ function saveOverrides(){
 
 }
 function jobKey(it, iso){
+  const dbid = String(it._db_id || it.id || '').trim();
+  if(dbid) return 'DB:' + dbid;
   const wo = (it.wo||'').trim();
-  if(wo) return 'WO:' + wo;
+  if(wo) return 'WO:' + wo + '|' + iso;
   const site = (it.site||'').trim();
   const plage = (it.plage||'').trim();
-  return 'SITE:' + site + '|' + iso + '|' + plage;
+  const dest = (it.destination||'').trim();
+  return 'SITE:' + site + '|' + iso + '|' + plage + '|' + dest;
 }
 function setTechOverride(key, tech){ techOverrides[key] = tech; saveOverrides(); }
 function clearTechOverride(key){ delete techOverrides[key]; saveOverrides(); }
