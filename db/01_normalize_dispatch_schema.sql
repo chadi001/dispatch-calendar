@@ -97,3 +97,78 @@ create table if not exists public.planning_proposals (
 create index if not exists idx_plan_prop_run on public.planning_proposals(run_id);
 
 commit;
+
+-- ------------------------------------------------------------
+-- Optional: load data from staging table into jobs
+-- Assumes staging table: public.staging_jobs_import
+-- Required columns in staging:
+--   prov_site, work_order, province, city, address, postal_code,
+--   date_scheduled_raw, start_time_raw, job_desc, client
+-- ------------------------------------------------------------
+/*
+begin;
+
+delete from public.jobs;
+
+with src as (
+  select
+    trim(coalesce(prov_site,'')) as site,
+    trim(coalesce(work_order,'')) as wo,
+    trim(coalesce(province,'')) as province,
+    trim(coalesce(city,'')) as city,
+    trim(coalesce(address,'')) as address,
+    trim(coalesce(postal_code,'')) as postal_code,
+    trim(coalesce(date_scheduled_raw,'')) as date_raw,
+    trim(coalesce(start_time_raw,'')) as time_raw,
+    trim(coalesce(job_desc,'')) as job_desc,
+    trim(coalesce(client,'')) as client
+  from public.staging_jobs_import
+  where upper(trim(coalesce(province,''))) = 'QC'
+), parsed as (
+  select
+    site,
+    wo,
+    'QC'::text as province,
+    city,
+    address,
+    postal_code,
+    case
+      when date_raw ~ '^[A-Za-z]{3}-\\d{1,2}$' then to_date(date_raw || '-2026', 'Mon-DD-YYYY')
+      when date_raw ~ '^\\d{4}-\\d{2}-\\d{2}$' then date_raw::date
+      else null
+    end as job_date,
+    case
+      when lower(time_raw) like '%9%' or lower(time_raw) like '%am%' then 'AM'
+      when lower(time_raw) like '%12%' or lower(time_raw) like '%pm%' then 'PM'
+      else null
+    end as slot,
+    nullif(client,'') as client,
+    nullif(job_desc,'') as job_desc
+  from src
+)
+insert into public.jobs (
+  job_date, slot, plage, tech_name, client,
+  province, city, address, site, prov_site,
+  wo, order_number, job_desc, cancelled, manual_lock
+)
+select
+  job_date,
+  coalesce(slot,'AM'),
+  coalesce(slot,'AM'),
+  'UNASSIGNED',
+  coalesce(client,'GOCO'),
+  province,
+  city,
+  address,
+  site,
+  site,
+  wo,
+  wo,
+  job_desc,
+  false,
+  false
+from parsed
+where job_date is not null;
+
+commit;
+*/

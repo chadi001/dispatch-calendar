@@ -641,26 +641,32 @@ Tech priority: <b>Adil</b> → <b>Abdel</b>. Capacity: 1 AM + 1 PM per tech/day.
   </div>
 
   <div class="kpiActions">
-    <button class="reset" id="btnExportMonthCsv" type="button">Export month locations CSV (for Google My Maps)</button>
-    <button class="reset" id="btnOpenMyMaps" type="button">Open Google My Maps</button>
-
-    <button class="reset" id="btnExportOverridesJson" type="button">Export overrides JSON</button>
-    <button class="reset" id="btnImportOverridesJson" type="button">Import overrides JSON</button>
-    <input id="fileImportOverrides" type="file" accept="application/json,.json" style="display:none"/>
-        <button class="reset" id="btnExportJobsCsv" type="button">Export jobs CSV</button>
     <button class="reset" id="btnImportJobsCsv" type="button">Import jobs CSV</button>
     <input id="fileImportJobsCsv" type="file" accept=".csv,text/csv" style="display:none"/>
-    
-    <button class="primary" id="btnAddJob" type="button">Add job</button>
-    <button class="reset" id="btnPlanGenerate" type="button">Generate plan</button>
-    <button class="reset" id="btnPlanOptimize" type="button">Optimize routes</button>
+
+    <button class="primary" id="btnPlanGenerate" type="button">Generate plan</button>
+    <button class="primary" id="btnPlanOptimize" type="button">Optimize routes</button>
     <button class="reset" id="btnPlanCompare" type="button">Compare scenario</button>
     <button class="reset" id="btnPlanApply" type="button">Apply scenario</button>
     <button class="reset" id="btnPlanExport" type="button">Export scenario CSV</button>
-    <button class="reset" id="btnExportAllJson" type="button">Export ALL JSON (jobs + overrides)</button>
-    <button class="reset" id="btnImportAllJson" type="button">Import ALL JSON (jobs + overrides)</button>
+    <button class="reset" id="btnAddJob" type="button">Add job</button>
+
+    <details style="width:100%;margin-top:6px">
+      <summary style="cursor:pointer;font-weight:600">Advanced tools</summary>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+        <button class="reset" id="btnExportJobsCsv" type="button">Export jobs CSV</button>
+        <button class="reset" id="btnExportMonthCsv" type="button">Export month locations CSV</button>
+        <button class="reset" id="btnOpenMyMaps" type="button">Open Google My Maps</button>
+        <button class="reset" id="btnExportOverridesJson" type="button">Export overrides JSON</button>
+        <button class="reset" id="btnImportOverridesJson" type="button">Import overrides JSON</button>
+        <button class="reset" id="btnExportAllJson" type="button">Export ALL JSON</button>
+        <button class="reset" id="btnImportAllJson" type="button">Import ALL JSON</button>
+      </div>
+    </details>
+
+    <input id="fileImportOverrides" type="file" accept="application/json,.json" style="display:none"/>
     <input id="fileImportAll" type="file" accept="application/json,.json" style="display:none"/>
-<span class="kpiHint">Tip: Export the CSV, then import it into My Maps to get pins for the month.</span>
+    <span class="kpiHint">Core flow: Import CSV → Generate/Optimize → Compare → Apply → Export scenario CSV.</span>
   </div>
 
   <div class="kpiSplit">
