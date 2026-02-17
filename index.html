@@ -648,6 +648,7 @@ Tech priority: <b>Adil</b> → <b>Abdel</b>. Capacity: 1 AM + 1 PM per tech/day.
     <button class="primary" id="btnPlanOptimize" type="button">Optimize routes</button>
     <button class="reset" id="btnPlanCompare" type="button">Compare scenario</button>
     <button class="reset" id="btnPlanApply" type="button">Apply scenario</button>
+    <button class="reset" id="btnPlanReset" type="button">Reset to imported data</button>
     <button class="reset" id="btnPlanExport" type="button">Export scenario CSV</button>
     <button class="reset" id="btnAddJob" type="button">Add job</button>
 
@@ -777,6 +778,7 @@ Tech priority: <b>Adil</b> → <b>Abdel</b>. Capacity: 1 AM + 1 PM per tech/day.
     </div>
     <div class="modal-footer">
       <button type="button" class="reset" id="btnPlanApplyFromModal">Apply scenario</button>
+      <button type="button" class="reset" id="btnPlanResetFromModal">Reset to imported data</button>
       <button type="button" class="reset" id="btnPlanExportFromModal">Export CSV</button>
     </div>
   </div>
@@ -1981,28 +1983,43 @@ function computePlanScenario(jobs, unavailable, optimize){
   const changes=[];
   const warnings=[];
   const unlocked = jobs.filter(j=>!j.locked);
+  const changedByMonth = {};
+  const lockedCount = jobs.length - unlocked.length;
+
+  if(lockedCount>0){
+    warnings.push(`${lockedCount} jobs are manually locked and were skipped.`);
+  }
 
   for(const job of unlocked){
-    const currentSlot = job.slot || 'AM';
-    const slots = currentSlot ? [currentSlot, (currentSlot==='AM'?'PM':'AM')] : ['AM','PM'];
+    const currentSlot = (job.slot==='PM') ? 'PM' : 'AM';
+    const slots = [currentSlot, (currentSlot==='AM'?'PM':'AM')];
     const dateOffsets = optimize
       ? [-plannerSettings.windowDays,-1,0,1,plannerSettings.windowDays]
       : [0];
-    let best = { score: Number.POSITIVE_INFINITY, iso:job.iso, tech:job.tech, slot:currentSlot };
+    let best = null;
 
     for(const off of dateOffsets){
       const candIso = isoAddDays(job.iso, off);
-      const priority = techPriorityForDate(candIso, unavailable);
+      let priority = techPriorityForDate(candIso, unavailable);
+      if(!priority.length){
+        priority = (monthNum(candIso)===4) ? plannerSettings.aprilPriority.slice() : plannerSettings.defaultPriority.slice();
+      }
       const techCandidates = priority.concat(['UNASSIGNED']);
       for(const candTech of techCandidates){
         for(const candSlot of slots){
           if(!feasible(idx, candIso, candTech, candSlot)) continue;
-          const sc = scorePlacement(job, candIso, candTech, candSlot, idx, optimize);
-          if(sc < best.score){
+          let sc = scorePlacement(job, candIso, candTech, candSlot, idx, optimize);
+          if(!optimize && candIso!==job.iso) sc += 9999;
+          if(job.tech==='UNASSIGNED' && candTech!=='UNASSIGNED' && candIso===job.iso) sc -= 500;
+          if(!best || sc < best.score){
             best = { score:sc, iso:candIso, tech:candTech, slot:candSlot };
           }
         }
       }
+    }
+
+    if(!best){
+      best = { score: Number.POSITIVE_INFINITY, iso:job.iso, tech:job.tech, slot:currentSlot };
     }
 
     const changed = (best.iso!==job.iso) || (best.tech!==job.tech) || (best.slot!==currentSlot);
@@ -2020,19 +2037,26 @@ function computePlanScenario(jobs, unavailable, optimize){
         newSlot:best.slot,
         score:best.score
       });
+      const m = String(best.iso).slice(0,7);
+      changedByMonth[m] = (changedByMonth[m]||0)+1;
     }
     add(best.iso, best.tech, best.slot, job.city, job.region);
   }
 
   const unassigned = changes.filter(c=>c.newTech==='UNASSIGNED').length;
   if(unassigned>0) warnings.push(`${unassigned} jobs remain UNASSIGNED after planning.`);
+  if(!changes.length && jobs.some(j=>j.tech==='UNASSIGNED')){
+    warnings.push('No changes were generated. Check locked jobs, filters, or tech availability constraints.');
+  }
 
   return {
     createdAt:new Date().toISOString(),
     optimize:!!optimize,
     totalJobs:jobs.length,
+    lockedCount,
     changed:changes.length,
     changes,
+    changedByMonth,
     warnings
   };
 }
@@ -2052,9 +2076,15 @@ function renderPlanScenarioModal(){
     meta.innerHTML = `
       <span class="planBadge">Mode: ${s.optimize ? 'Optimize routes' : 'Generate plan'}</span>
       <span class="planBadge">Jobs: ${s.totalJobs}</span>
+      <span class="planBadge">Locked: ${s.lockedCount||0}</span>
       <span class="planBadge">Changes: ${s.changed}</span>
       <span class="planBadge">Built: ${new Date(s.createdAt).toLocaleString()}</span>
     `;
+    const monthBits = Object.entries(s.changedByMonth||{})
+      .sort((a,b)=>a[0].localeCompare(b[0]))
+      .map(([m,n])=>`<span class="planBadge">${m}: ${n}</span>`)
+      .join('');
+    if(monthBits) meta.innerHTML += monthBits;
     warn.textContent = s.warnings.join(' ');
     const rows = s.changes.slice(0,300).map(c=>`
       <tr>
@@ -2101,6 +2131,20 @@ function applyPlanScenario(){
   alert(`Scenario applied: ${__planScenario.changes.length} job changes.`);
 }
 
+function resetToImportedData(){
+  if(!requireAdminAction()) return;
+  if(!confirm('Reset all overrides and return to imported DB data?')) return;
+  techOverrides = {};
+  plageOverrides = {};
+  dateOverrides = {};
+  cancelOverrides = {};
+  manualLocks = {};
+  saveOverrides();
+  __planScenario = null;
+  rerenderActive();
+  alert('Reset complete. Back to imported data.');
+}
+
 function exportPlanScenarioCsv(){
   if(!requireAdminAction()) return;
   if(!__planScenario){ alert('No scenario to export.'); return; }
@@ -2126,10 +2170,12 @@ document.getElementById('btnPlanGenerate')?.addEventListener('click', ()=>runPla
 document.getElementById('btnPlanOptimize')?.addEventListener('click', ()=>runPlanScenario(true));
 document.getElementById('btnPlanCompare')?.addEventListener('click', ()=>{ if(requireAdminAction()) renderPlanScenarioModal(); });
 document.getElementById('btnPlanApply')?.addEventListener('click', applyPlanScenario);
+document.getElementById('btnPlanReset')?.addEventListener('click', resetToImportedData);
 document.getElementById('btnPlanExport')?.addEventListener('click', exportPlanScenarioCsv);
 document.getElementById('btnClosePlanScenario')?.addEventListener('click', closePlanScenarioModal);
 document.getElementById('planScenarioBackdrop')?.addEventListener('click', closePlanScenarioModal);
 document.getElementById('btnPlanApplyFromModal')?.addEventListener('click', applyPlanScenario);
+document.getElementById('btnPlanResetFromModal')?.addEventListener('click', resetToImportedData);
 document.getElementById('btnPlanExportFromModal')?.addEventListener('click', exportPlanScenarioCsv);
 
 // ---------------- Manual jobs (localStorage) ----------------
@@ -2820,14 +2866,14 @@ function setEditModeUI(){
     "btnExportJobsCsv", "btnImportJobsCsv",
     "btnExportAllJson", "btnImportAllJson",
     "btnAddJob",
-    "btnPlanGenerate", "btnPlanOptimize", "btnPlanCompare", "btnPlanApply", "btnPlanExport",
+    "btnPlanGenerate", "btnPlanOptimize", "btnPlanCompare", "btnPlanApply", "btnPlanReset", "btnPlanExport",
 
     // file inputs for imports
     "fileImportOverrides", "fileImportJobsCsv", "fileImportAll",
 
     // add-job modal controls
     "btnCloseAddJob", "btnAddJobCancel", "btnAddJobConfirm",
-    "btnClosePlanScenario", "btnPlanApplyFromModal", "btnPlanExportFromModal",
+    "btnClosePlanScenario", "btnPlanApplyFromModal", "btnPlanResetFromModal", "btnPlanExportFromModal",
     "aj_client","aj_site","aj_wo","aj_province","aj_city","aj_address","aj_date","aj_plage","aj_tech","aj_keepOpen"
   ];
 
