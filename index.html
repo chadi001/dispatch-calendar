@@ -1838,16 +1838,16 @@ document.getElementById('btnImportAllJson')?.addEventListener('click', ()=>pickF
 // ---------------- Planner / Optimizer (admin only) ----------------
 let __planScenario = null;
 const plannerSettings = {
-  defaultPriority: ['Adil','Abdel','Tech A'],
-  aprilPriority: ['Adil','Abdel','Tech A','Chadi'],
+  defaultPriority: ['Adil','Abdel','Tech A','Tech B'],
+  aprilPriority: ['Adil','Abdel','Tech A','Chadi','Tech B'],
   maxPerDay: 2,
   cityClusterWeight: 12,
   regionClusterWeight: 8,
-  dateShiftWeight: 40,
+  dateShiftWeight: 16,
   slotChangePenalty: 5,
   techChangePenalty: 10,
   unassignedPenalty: 1000,
-  windowDays: 2
+  windowDays: 7
 };
 
 function requireAdminAction(){
@@ -1939,15 +1939,29 @@ function makeScheduleIndex(jobs){
   const add=(iso,tech,slot,city,region)=>{
     if(!iso||!tech||!slot) return;
     if(!idx[iso]) idx[iso]={};
-    if(!idx[iso][tech]) idx[iso][tech]={AM:0,PM:0,cityCount:{},regionCount:{}};
+    if(!idx[iso][tech]) idx[iso][tech]={AM:0,PM:0,cityCount:{},regionCount:{},slotInfo:{AM:[],PM:[]}};
     idx[iso][tech][slot] = (idx[iso][tech][slot]||0)+1;
     const c = city||'';
     const r = region||'';
     idx[iso][tech].cityCount[c] = (idx[iso][tech].cityCount[c]||0)+1;
     idx[iso][tech].regionCount[r] = (idx[iso][tech].regionCount[r]||0)+1;
+    if(idx[iso][tech].slotInfo[slot]) idx[iso][tech].slotInfo[slot].push({city:c,region:r});
   };
   jobs.forEach(j=>{ if(j.locked) add(j.iso, j.tech, j.slot||'AM', j.city, j.region); });
   return { idx, add };
+}
+
+function cityRegionSim(a,b){
+  if(!a || !b) return 0;
+  if(a.city && b.city && normText(a.city)===normText(b.city)) return 2;
+  if(a.region && b.region && normText(a.region)===normText(b.region)) return 1;
+  return 0;
+}
+
+function buildOffsets(windowDays){
+  const arr=[0];
+  for(let i=1;i<=windowDays;i++) arr.push(-i, i);
+  return arr;
 }
 
 function scorePlacement(job, candIso, candTech, candSlot, index, optimize){
@@ -1963,6 +1977,12 @@ function scorePlacement(job, candIso, candTech, candSlot, index, optimize){
   const regN = cell?.regionCount?.[job.region] || 0;
   s -= cityN * plannerSettings.cityClusterWeight;
   s -= regN * plannerSettings.regionClusterWeight;
+
+  const other = candSlot==='AM' ? 'PM' : 'AM';
+  const partners = cell?.slotInfo?.[other] || [];
+  const bestPartner = partners.reduce((acc,p)=>Math.max(acc, cityRegionSim({city:job.city,region:job.region}, p)), 0);
+  if(bestPartner===2) s -= 70;
+  else if(bestPartner===1) s -= 30;
 
   if(!optimize) s += dateShift*20;
   if(cityNearHq(job.city) && dateShift>0) s += 4;
@@ -1982,9 +2002,15 @@ function computePlanScenario(jobs, unavailable, optimize){
   const { idx, add } = makeScheduleIndex(jobs);
   const changes=[];
   const warnings=[];
-  const unlocked = jobs.filter(j=>!j.locked);
+  const unlocked = jobs.filter(j=>!j.locked).sort((a,b)=>{
+    const au = a.tech==='UNASSIGNED' ? 0 : 1;
+    const bu = b.tech==='UNASSIGNED' ? 0 : 1;
+    if(au!==bu) return au-bu;
+    return a.iso.localeCompare(b.iso) || a.city.localeCompare(b.city);
+  });
   const changedByMonth = {};
   const lockedCount = jobs.length - unlocked.length;
+  const beforeUnassigned = jobs.filter(j=>j.tech==='UNASSIGNED').length;
 
   if(lockedCount>0){
     warnings.push(`${lockedCount} jobs are manually locked and were skipped.`);
@@ -1994,7 +2020,7 @@ function computePlanScenario(jobs, unavailable, optimize){
     const currentSlot = (job.slot==='PM') ? 'PM' : 'AM';
     const slots = [currentSlot, (currentSlot==='AM'?'PM':'AM')];
     const dateOffsets = optimize
-      ? [-plannerSettings.windowDays,-1,0,1,plannerSettings.windowDays]
+      ? buildOffsets(plannerSettings.windowDays)
       : [0];
     let best = null;
 
@@ -2043,11 +2069,92 @@ function computePlanScenario(jobs, unavailable, optimize){
     add(best.iso, best.tech, best.slot, job.city, job.region);
   }
 
-  const unassigned = changes.filter(c=>c.newTech==='UNASSIGNED').length;
-  if(unassigned>0) warnings.push(`${unassigned} jobs remain UNASSIGNED after planning.`);
   if(!changes.length && jobs.some(j=>j.tech==='UNASSIGNED')){
     warnings.push('No changes were generated. Check locked jobs, filters, or tech availability constraints.');
   }
+
+  // local swap optimization: same date + same slot swaps between techs to improve area cohesion
+  if(optimize && changes.length){
+    const byDate = {};
+    const map = {};
+    for(const j of jobs){
+      const key = j.key;
+      map[key] = {
+        key,
+        iso:j.iso,
+        slot:(j.slot==='PM'?'PM':'AM'),
+        tech:j.tech,
+        city:j.city,
+        region:j.region,
+        wo:j.wo,
+        site:j.site,
+        locked:j.locked
+      };
+    }
+    for(const c of changes){
+      const m = map[c.key];
+      if(!m) continue;
+      m.iso = c.newIso;
+      m.slot = c.newSlot;
+      m.tech = c.newTech;
+    }
+    Object.values(map).forEach(m=>{
+      if(m.locked || m.tech==='UNASSIGNED') return;
+      if(!byDate[m.iso]) byDate[m.iso]=[];
+      byDate[m.iso].push(m);
+    });
+
+    const getPartner = (arr, tech, slot) => arr.find(x=>x.tech===tech && x.slot===slot);
+    for(const iso of Object.keys(byDate)){
+      const arr = byDate[iso];
+      for(const slot of ['AM','PM']){
+        const sameSlot = arr.filter(x=>x.slot===slot);
+        for(let i=0;i<sameSlot.length;i++){
+          for(let j=i+1;j<sameSlot.length;j++){
+            const a = sameSlot[i], b = sameSlot[j];
+            if(a.tech===b.tech) continue;
+            const other = slot==='AM'?'PM':'AM';
+            const pa = getPartner(arr, a.tech, other);
+            const pb = getPartner(arr, b.tech, other);
+            if(!pa && !pb) continue;
+            const before = cityRegionSim(a,pa) + cityRegionSim(b,pb);
+            const after = cityRegionSim({city:a.city,region:a.region},pb) + cityRegionSim({city:b.city,region:b.region},pa);
+            if(after > before){
+              const t=a.tech; a.tech=b.tech; b.tech=t;
+            }
+          }
+        }
+      }
+    }
+
+    const deltaByKey = {};
+    Object.values(map).forEach(m=>{
+      const old = jobs.find(j=>j.key===m.key);
+      if(!old || old.locked) return;
+      if(old.iso!==m.iso || old.slot!==m.slot || old.tech!==m.tech){
+        deltaByKey[m.key] = {
+          key:m.key, wo:m.wo, site:m.site, city:m.city,
+          oldIso:old.iso, newIso:m.iso,
+          oldTech:old.tech, newTech:m.tech,
+          oldSlot:old.slot, newSlot:m.slot,
+          score:0
+        };
+      }
+    });
+    changes.length = 0;
+    Object.values(deltaByKey).forEach(x=>changes.push(x));
+  }
+
+  // recompute per-month summary from final change set
+  for(const k of Object.keys(changedByMonth)) delete changedByMonth[k];
+  changes.forEach(c=>{
+    const m = String(c.newIso).slice(0,7);
+    changedByMonth[m] = (changedByMonth[m]||0)+1;
+  });
+
+  const afterUnassigned = Math.max(0, beforeUnassigned - changes.filter(c=>c.oldTech==='UNASSIGNED' && c.newTech!=='UNASSIGNED').length + changes.filter(c=>c.oldTech!=='UNASSIGNED' && c.newTech==='UNASSIGNED').length);
+  if(afterUnassigned>0) warnings.push(`${afterUnassigned} jobs remain UNASSIGNED after planning.`);
+  warnings.push(`UNASSIGNED before: ${beforeUnassigned}, after proposal: ${afterUnassigned}.`);
 
   return {
     createdAt:new Date().toISOString(),
