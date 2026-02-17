@@ -33,6 +33,7 @@ as $$
   );
 $$;
 
+-- Enable RLS on all tables
 alter table public.jobs enable row level security;
 alter table public.dispatch_override_packs enable row level security;
 alter table public.tech_unavailability enable row level security;
@@ -40,6 +41,8 @@ alter table public.tech_capacity enable row level security;
 alter table public.job_assignments enable row level security;
 alter table public.planning_runs enable row level security;
 alter table public.planning_proposals enable row level security;
+alter table public.tech_profiles enable row level security;
+alter table public.tech_name_map enable row level security;
 
 -- jobs
 drop policy if exists jobs_admin_all on public.jobs;
@@ -67,6 +70,24 @@ create policy override_admin_all on public.dispatch_override_packs
 for all
 using (public.is_admin_user())
 with check (public.is_admin_user());
+
+-- tech_profiles (admin can manage all, users can read own)
+drop policy if exists tech_profiles_admin_all on public.tech_profiles;
+create policy tech_profiles_admin_all on public.tech_profiles
+for all using (public.is_admin_user()) with check (public.is_admin_user());
+
+drop policy if exists tech_profiles_self_read on public.tech_profiles;
+create policy tech_profiles_self_read on public.tech_profiles
+for select using (user_id = auth.uid());
+
+-- tech_name_map (admin can manage all, users can read own)
+drop policy if exists tech_name_map_admin_all on public.tech_name_map;
+create policy tech_name_map_admin_all on public.tech_name_map
+for all using (public.is_admin_user()) with check (public.is_admin_user());
+
+drop policy if exists tech_name_map_self_read on public.tech_name_map;
+create policy tech_name_map_self_read on public.tech_name_map
+for select using (user_id = auth.uid());
 
 -- availability/capacity/admin planning tables (admin only)
 drop policy if exists tech_unavailability_admin_all on public.tech_unavailability;
