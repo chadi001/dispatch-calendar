@@ -923,6 +923,26 @@ function selectedTechs(){ return Array.from(document.querySelectorAll("#techChec
 function currentFilters(){
   return {techs:selectedTechs(), region:regionFilter.value, problemsOnly:problemsOnly.checked, showCancelled: (document.getElementById('showCancelled')||{checked:false}).checked};
 }
+function effectiveTechFor(it, iso){
+  const k = jobKey(it, iso||'');
+  return (techOverrides[k]!==undefined ? techOverrides[k] : (it.tech||'UNASSIGNED'));
+}
+function effectivePlageFor(it, iso){
+  const k = jobKey(it, iso||'');
+  return (plageOverrides[k]!==undefined ? plageOverrides[k] : (it.plage||'AM'));
+}
+function normalizeDisplayItem(it, iso){
+  const k = jobKey(it, iso||'');
+  const tech = effectiveTechFor(it, iso);
+  const plage = effectivePlageFor(it, iso);
+  return {
+    ...it,
+    tech,
+    plage,
+    unassigned: isUnassignedTech(tech),
+    _cancelled: !!cancelOverrides[k]
+  };
+}
 function matchFilters(it, filters){
   if(!filters.showCancelled && it._cancelled) return false;
   if(filters.techs.length>0 && !filters.techs.includes(it.tech)) return false;
@@ -934,11 +954,8 @@ function plageSort(p){ return p==="AM"?0:(p==="PM"?1:2); }
 
 function itemsForDate(m, iso, filters){
   const all=(m.date_index && m.date_index[iso]) ? m.date_index[iso] : [];
-  for(const it of all){
-    const k = jobKey(it, iso);
-    it._cancelled = !!cancelOverrides[k];
-  }
-  const arr=all.filter(it=>matchFilters(it,filters));
+  const normalized = all.map(it=>normalizeDisplayItem(it, iso));
+  const arr=normalized.filter(it=>matchFilters(it,filters));
   arr.sort((a,b)=>plageSort(a.plage)-plageSort(b.plage) || (a.tech||"").localeCompare(b.tech||""));
   return arr;
 }
@@ -1312,7 +1329,7 @@ function makePanel(mid, m){
       let maxLen=0;
       const wkCounts={}; TECHS.forEach(t=>wkCounts[t]=0);
       for(let i=0;i<7;i++){
-        const arr=(byDow[i]||[]).filter(it=>matchFilters(it,filters));
+        const arr=((byDow[i]||[]).map(it=>normalizeDisplayItem(it, ''))).filter(it=>matchFilters(it,filters));
         arr.sort((a,b)=>plageSort(a.plage)-plageSort(b.plage) || (a.tech||"").localeCompare(b.tech||""));
         filtered[i]=arr;
         maxLen=Math.max(maxLen, arr.length);
@@ -1391,7 +1408,8 @@ function collectMonthItems(monthId, filters){
   const out=[];
   for(const iso of Object.keys(m.date_index||{})){
     for(const it of (m.date_index[iso]||[])){
-      if(matchFilters(it, filters)) out.push({...it, iso});
+      const n = normalizeDisplayItem(it, iso);
+      if(matchFilters(n, filters)) out.push({...n, iso});
     }
   }
   out.sort((a,b)=>plageSort(a.plage)-plageSort(b.plage) || (a.tech||'').localeCompare(b.tech||''));
@@ -1519,7 +1537,7 @@ function renderKpis(){
     for(const iso of Object.keys(byDate)){
       const cByTech={}; TECHS.forEach(t=>cByTech[t]=0);
       for(const it of (byDate[iso]||[])){
-        const t=(it.tech||'UNASSIGNED');
+        const t=effectiveTechFor(it, iso);
         cByTech[t]=(cByTech[t]||0)+1;
       }
       if((cByTech['Adil']||0)>2) overCap++; if((cByTech['Abdel']||0)>2) overCap++;
