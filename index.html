@@ -986,6 +986,7 @@ function buildDrawer(){
 }
 function openDrawer(drawer, title, items, iso){
   drawer.classList.add('active');
+  drawer.dataset.iso = iso || '';
   drawer.querySelector('#drawerTitle').textContent=title;
   const list=drawer.querySelector('#drawerList');
   list.innerHTML='';
@@ -1226,7 +1227,7 @@ function makePanel(mid, m){
   const panel=el('div',{class:'panel',id:'panel-'+mid});
   const drawer=buildDrawer();
   panel.appendChild(drawer);
-  drawer.querySelector('#drawerClose').onclick=()=>{ drawer.classList.remove('active'); clearSelected(panel); };
+  drawer.querySelector('#drawerClose').onclick=()=>{ drawer.classList.remove('active'); drawer.dataset.iso=''; clearSelected(panel); };
 
   const grid=el('div',{class:'grid'});
   const dows=['MON','TUE','WED','THU','FRI','SAT','SUN'];
@@ -1314,6 +1315,15 @@ function makePanel(mid, m){
         });
 
         grid.appendChild(a);
+      }
+    }
+
+    // If drawer is open, refresh its content from latest effective values
+    if(drawer.classList.contains('active')){
+      const openIso = drawer.dataset.iso || '';
+      if(openIso){
+        const refreshed = itemsForDate(m, openIso, filters);
+        openDrawer(drawer, `Jobs for ${openIso} (${refreshed.length})`, refreshed, openIso);
       }
     }
 
