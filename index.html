@@ -1871,6 +1871,7 @@ function isoAddDays(iso, days){
 }
 
 function normText(s){ return String(s||'').trim().toLowerCase(); }
+function isUnassignedTech(t){ return normText(t)==='unassigned'; }
 
 function monthNum(iso){ return parseInt(String(iso||'').slice(5,7),10)||0; }
 
@@ -1968,7 +1969,7 @@ function scorePlacement(job, candIso, candTech, candSlot, index, optimize){
   let s = 0;
   const dateShift = Math.abs((toDateObj(candIso)-toDateObj(job.iso))/86400000);
   s += dateShift * plannerSettings.dateShiftWeight;
-  if(candTech==='UNASSIGNED') s += plannerSettings.unassignedPenalty;
+  if(isUnassignedTech(candTech)) s += plannerSettings.unassignedPenalty;
   if(candSlot !== (job.slot||'AM')) s += plannerSettings.slotChangePenalty;
   if(candTech !== job.tech) s += plannerSettings.techChangePenalty;
 
@@ -2002,15 +2003,15 @@ function computePlanScenario(jobs, unavailable, optimize){
   const { idx, add } = makeScheduleIndex(jobs);
   const changes=[];
   const warnings=[];
-  const unlocked = jobs.filter(j=>!j.locked).sort((a,b)=>{
-    const au = a.tech==='UNASSIGNED' ? 0 : 1;
-    const bu = b.tech==='UNASSIGNED' ? 0 : 1;
+    const unlocked = jobs.filter(j=>!j.locked).sort((a,b)=>{
+    const au = isUnassignedTech(a.tech) ? 0 : 1;
+    const bu = isUnassignedTech(b.tech) ? 0 : 1;
     if(au!==bu) return au-bu;
     return a.iso.localeCompare(b.iso) || a.city.localeCompare(b.city);
   });
   const changedByMonth = {};
   const lockedCount = jobs.length - unlocked.length;
-  const beforeUnassigned = jobs.filter(j=>j.tech==='UNASSIGNED').length;
+  const beforeUnassigned = jobs.filter(j=>isUnassignedTech(j.tech)).length;
 
   if(lockedCount>0){
     warnings.push(`${lockedCount} jobs are manually locked and were skipped.`);
@@ -2036,7 +2037,7 @@ function computePlanScenario(jobs, unavailable, optimize){
           if(!feasible(idx, candIso, candTech, candSlot)) continue;
           let sc = scorePlacement(job, candIso, candTech, candSlot, idx, optimize);
           if(!optimize && candIso!==job.iso) sc += 9999;
-          if(job.tech==='UNASSIGNED' && candTech!=='UNASSIGNED' && candIso===job.iso) sc -= 500;
+          if(isUnassignedTech(job.tech) && !isUnassignedTech(candTech) && candIso===job.iso) sc -= 500;
           if(!best || sc < best.score){
             best = { score:sc, iso:candIso, tech:candTech, slot:candSlot };
           }
@@ -2099,7 +2100,7 @@ function computePlanScenario(jobs, unavailable, optimize){
       m.tech = c.newTech;
     }
     Object.values(map).forEach(m=>{
-      if(m.locked || m.tech==='UNASSIGNED') return;
+      if(m.locked || isUnassignedTech(m.tech)) return;
       if(!byDate[m.iso]) byDate[m.iso]=[];
       byDate[m.iso].push(m);
     });
@@ -2152,7 +2153,7 @@ function computePlanScenario(jobs, unavailable, optimize){
     changedByMonth[m] = (changedByMonth[m]||0)+1;
   });
 
-  const afterUnassigned = Math.max(0, beforeUnassigned - changes.filter(c=>c.oldTech==='UNASSIGNED' && c.newTech!=='UNASSIGNED').length + changes.filter(c=>c.oldTech!=='UNASSIGNED' && c.newTech==='UNASSIGNED').length);
+  const afterUnassigned = Math.max(0, beforeUnassigned - changes.filter(c=>isUnassignedTech(c.oldTech) && !isUnassignedTech(c.newTech)).length + changes.filter(c=>!isUnassignedTech(c.oldTech) && isUnassignedTech(c.newTech)).length);
   if(afterUnassigned>0) warnings.push(`${afterUnassigned} jobs remain UNASSIGNED after planning.`);
   warnings.push(`UNASSIGNED before: ${beforeUnassigned}, after proposal: ${afterUnassigned}.`);
 
@@ -2193,7 +2194,7 @@ function renderPlanScenarioModal(){
       .join('');
     if(monthBits) meta.innerHTML += monthBits;
     warn.textContent = s.warnings.join(' ');
-    const rows = s.changes.slice(0,300).map(c=>`
+    const rows = s.changes.map(c=>`
       <tr>
         <td>${c.wo||''}</td>
         <td>${c.site||''}</td>
@@ -2207,6 +2208,7 @@ function renderPlanScenarioModal(){
       </tr>
     `).join('');
     out.innerHTML = `
+      <div class="small" style="margin-bottom:8px;color:#6b7280">Showing ${s.changes.length} proposed change(s).</div>
       <table class="resultsTable">
         <thead>
           <tr><th>WO</th><th>Site</th><th>City</th><th>Old date</th><th>New date</th><th>Old slot</th><th>New slot</th><th>Old tech</th><th>New tech</th></tr>
