@@ -170,6 +170,17 @@ button.reset:hover{background:#f6f8ff;}
 .planMeta{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0;color:#4b5563;font-size:12px}
 .planBadge{border:1px solid #e5e7eb;border-radius:999px;padding:2px 8px;background:#f9fafb}
 .planWarn{color:#b91c1c;font-weight:700}
+.hiddenInput{display:none!important}
+
+.plannerBar{display:flex;flex-direction:column;gap:10px;border:1px solid #e5e7eb;border-radius:12px;padding:10px;background:linear-gradient(180deg,#ffffff 0%,#f9fafb 100%)}
+.plannerActionsRow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.plannerActionsRow .primary{background:#0f766e;border-color:#0f766e;color:#fff}
+.plannerActionsRow .primary:hover{filter:brightness(.95)}
+.scenarioStrip{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px;border:1px solid #dbeafe;background:#eff6ff;border-radius:10px}
+.scenarioStrip .title{font-size:12px;font-weight:700;color:#1d4ed8;margin-right:4px}
+.scenarioStrip .chip{font-size:12px;border-radius:999px;padding:2px 8px;background:#fff;border:1px solid #bfdbfe;color:#1e3a8a}
+.scenarioStrip .chip.warn{border-color:#fecaca;color:#991b1b;background:#fff1f2}
+.plannerAdvanced summary{cursor:pointer;font-weight:700;color:#374151}
 
 </style> 
 <!-- Supabase client with CDN fallback -->
@@ -641,33 +652,35 @@ Tech priority: <b>Adil</b> → <b>Abdel</b>. Capacity: 1 AM + 1 PM per tech/day.
   </div>
 
   <div class="kpiActions">
-    <button class="reset" id="btnImportJobsCsv" type="button">Import jobs CSV</button>
-    <input id="fileImportJobsCsv" type="file" accept=".csv,text/csv" style="display:none"/>
+    <div class="plannerBar">
+      <div class="plannerActionsRow">
+        <button class="reset" id="btnImportJobsCsv" type="button">Import jobs CSV</button>
+        <input class="hiddenInput" id="fileImportJobsCsv" type="file" accept=".csv,text/csv"/>
 
-    <button class="primary" id="btnPlanGenerate" type="button">Generate plan</button>
-    <button class="primary" id="btnPlanOptimize" type="button">Optimize routes</button>
-    <button class="reset" id="btnPlanCompare" type="button">Compare scenario</button>
-    <button class="reset" id="btnPlanApply" type="button">Apply scenario</button>
-    <button class="reset" id="btnPlanReset" type="button">Reset to imported data</button>
-    <button class="reset" id="btnPlanExport" type="button">Export scenario CSV</button>
-    <button class="reset" id="btnAddJob" type="button">Add job</button>
-
-    <details style="width:100%;margin-top:6px">
-      <summary style="cursor:pointer;font-weight:600">Advanced tools</summary>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
-        <button class="reset" id="btnExportJobsCsv" type="button">Export jobs CSV</button>
-        <button class="reset" id="btnExportMonthCsv" type="button">Export month locations CSV</button>
-        <button class="reset" id="btnOpenMyMaps" type="button">Open Google My Maps</button>
-        <button class="reset" id="btnExportOverridesJson" type="button">Export overrides JSON</button>
-        <button class="reset" id="btnImportOverridesJson" type="button">Import overrides JSON</button>
-        <button class="reset" id="btnExportAllJson" type="button">Export ALL JSON</button>
-        <button class="reset" id="btnImportAllJson" type="button">Import ALL JSON</button>
+        <button class="primary" id="btnPlanGenerate" type="button">Generate plan</button>
+        <button class="primary" id="btnPlanOptimize" type="button">Optimize routes</button>
+        <button class="reset" id="btnPlanCompare" type="button">Compare scenario</button>
+        <button class="reset" id="btnPlanApply" type="button">Apply scenario</button>
+        <button class="reset" id="btnPlanReset" type="button">Reset to imported data</button>
+        <button class="reset" id="btnPlanExport" type="button">Export scenario CSV</button>
       </div>
-    </details>
 
-    <input id="fileImportOverrides" type="file" accept="application/json,.json" style="display:none"/>
-    <input id="fileImportAll" type="file" accept="application/json,.json" style="display:none"/>
-    <span class="kpiHint">Core flow: Import CSV → Generate/Optimize → Compare → Apply → Export scenario CSV.</span>
+      <div id="scenarioSummaryStrip" class="scenarioStrip" style="display:none"></div>
+
+      <details class="plannerAdvanced">
+        <summary>Advanced tools</summary>
+        <div class="plannerActionsRow" style="margin-top:8px">
+          <button class="reset" id="btnExportJobsCsv" type="button">Export jobs CSV</button>
+          <button class="reset" id="btnExportOverridesJson" type="button">Export overrides JSON</button>
+          <button class="reset" id="btnImportOverridesJson" type="button">Import overrides JSON</button>
+          <button class="reset" id="btnAddJob" type="button">Add job</button>
+        </div>
+      </details>
+
+      <input class="hiddenInput" id="fileImportOverrides" type="file" accept="application/json,.json"/>
+      <input class="hiddenInput" id="fileImportAll" type="file" accept="application/json,.json"/>
+      <span class="kpiHint">Core flow: Import CSV -> Generate/Optimize -> Compare -> Apply -> Export scenario CSV.</span>
+    </div>
   </div>
 
   <div class="kpiSplit">
@@ -2156,6 +2169,9 @@ function computePlanScenario(jobs, unavailable, optimize){
   const afterUnassigned = Math.max(0, beforeUnassigned - changes.filter(c=>isUnassignedTech(c.oldTech) && !isUnassignedTech(c.newTech)).length + changes.filter(c=>!isUnassignedTech(c.oldTech) && isUnassignedTech(c.newTech)).length);
   if(afterUnassigned>0) warnings.push(`${afterUnassigned} jobs remain UNASSIGNED after planning.`);
   warnings.push(`UNASSIGNED before: ${beforeUnassigned}, after proposal: ${afterUnassigned}.`);
+  const dateMoves = changes.filter(c=>c.oldIso!==c.newIso).length;
+  const slotMoves = changes.filter(c=>c.oldSlot!==c.newSlot).length;
+  const techMoves = changes.filter(c=>c.oldTech!==c.newTech).length;
 
   return {
     createdAt:new Date().toISOString(),
@@ -2163,10 +2179,42 @@ function computePlanScenario(jobs, unavailable, optimize){
     totalJobs:jobs.length,
     lockedCount,
     changed:changes.length,
+    dateMoves,
+    slotMoves,
+    techMoves,
+    beforeUnassigned,
+    afterUnassigned,
     changes,
     changedByMonth,
     warnings
   };
+}
+
+function renderScenarioSummaryStrip(){
+  const el = document.getElementById('scenarioSummaryStrip');
+  if(!el) return;
+  if(!__planScenario){
+    el.style.display='none';
+    el.innerHTML='';
+    return;
+  }
+  const s = __planScenario;
+  const months = Object.entries(s.changedByMonth||{})
+    .sort((a,b)=>a[0].localeCompare(b[0]))
+    .map(([m,n])=>`<span class="chip">${m}: ${n}</span>`)
+    .join('');
+  const unassignedClass = (s.afterUnassigned||0) > 0 ? 'chip warn' : 'chip';
+  el.innerHTML = `
+    <span class="title">Scenario summary</span>
+    <span class="chip">Mode: ${s.optimize ? 'Optimize' : 'Generate'}</span>
+    <span class="chip">Changed: ${s.changed}</span>
+    <span class="chip">Date moves: ${s.dateMoves||0}</span>
+    <span class="chip">Slot moves: ${s.slotMoves||0}</span>
+    <span class="chip">Tech moves: ${s.techMoves||0}</span>
+    <span class="${unassignedClass}">UNASSIGNED: ${s.beforeUnassigned||0} -> ${s.afterUnassigned||0}</span>
+    ${months}
+  `;
+  el.style.display='flex';
 }
 
 function renderPlanScenarioModal(){
@@ -2237,6 +2285,7 @@ function applyPlanScenario(){
     if(c.newSlot!==c.oldSlot) setPlageOverride(c.key, c.newSlot); else clearPlageOverride(c.key);
   }
   rerenderActive();
+  renderScenarioSummaryStrip();
   alert(`Scenario applied: ${__planScenario.changes.length} job changes.`);
 }
 
@@ -2251,6 +2300,7 @@ function resetToImportedData(){
   saveOverrides();
   __planScenario = null;
   rerenderActive();
+  renderScenarioSummaryStrip();
   alert('Reset complete. Back to imported data.');
 }
 
@@ -2272,6 +2322,7 @@ async function runPlanScenario(optimize){
   const jobs = collectJobsForPlanning();
   const unavailable = await loadTechUnavailability();
   __planScenario = computePlanScenario(jobs, unavailable, !!optimize);
+  renderScenarioSummaryStrip();
   renderPlanScenarioModal();
 }
 
