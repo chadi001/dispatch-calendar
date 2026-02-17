@@ -167,6 +167,10 @@ button.reset:hover{background:#f6f8ff;}
 #orderSearchQuick{height:36px;min-width:220px;border:1px solid #e5e7eb;border-radius:10px;padding:0 12px;font-size:14px}
 #orderSearchQuick:focus{outline:none;border-color:#93c5fd;box-shadow:0 0 0 3px rgba(147,197,253,.35)}
 
+.planMeta{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0;color:#4b5563;font-size:12px}
+.planBadge{border:1px solid #e5e7eb;border-radius:999px;padding:2px 8px;background:#f9fafb}
+.planWarn{color:#b91c1c;font-weight:700}
+
 </style> 
 <!-- Supabase client with CDN fallback -->
 <script>
@@ -241,7 +245,53 @@ button.reset:hover{background:#f6f8ff;}
   window.IS_ADMIN = false;
   window.CAN_EDIT = false; // admin only
 
+  const APP_META = {
+    jobsCanonical: {
+      date: ['job_date'],
+      slot: ['slot','plage'],
+      tech: ['effective_tech','resolved_tech','tech_name'],
+      client: ['client','client_name'],
+      site: ['site','prov_site','site_id','site_name'],
+      workOrder: ['wo','work_order','order_number'],
+      city: ['region','city','admin_region'],
+      address: ['destination_display','full_address','destination','street_address','address'],
+      mapUrl: ['map_url_display','map_url','google_maps_link','url']
+    }
+  };
+
+  function pickField(obj, keys, fallback=''){
+    for(const k of (keys||[])){
+      const v = obj?.[k];
+      if(v !== undefined && v !== null && String(v).trim() !== '') return v;
+    }
+    return fallback;
+  }
+
   window.__DB_BOOTSTRAPPED = window.__DB_BOOTSTRAPPED || false;
+
+  async function dbValidateRuntimeSchema(){
+    if(!window.sb) return { ok:false, missing:['supabase_client'] };
+    const checks = [
+      { table:'jobs', cols:'id,job_date,tech_name,slot,plage,wo,order_number,site,prov_site,city,address,client,cancelled,manual_lock' },
+      { table:'admin_users', cols:'user_id' },
+      { table:'tech_profiles', cols:'user_id,display_name,tech_code,is_active' },
+      { table:'tech_name_map', cols:'user_id,tech_name,is_active' },
+      { table:'dispatch_override_packs', cols:'year,tech_overrides,plage_overrides,date_overrides,cancel_overrides,manual_locks' }
+    ];
+    const missing = [];
+    for(const c of checks){
+      try{
+        const { error } = await window.sb.from(c.table).select(c.cols).limit(1);
+        if(error) missing.push(c.table);
+      }catch(e){
+        missing.push(c.table);
+      }
+    }
+    const out = { ok: missing.length===0, missing };
+    window.DB_SCHEMA_STATUS = out;
+    if(!out.ok) console.warn('[schema] missing/invalid tables:', missing);
+    return out;
+  }
 
 
   async function dbLoadJobs() {
@@ -378,35 +428,26 @@ function resetCalendarKeepShape(){
 
 
 function jobRowToPayloadItem(r){
-  // Prefer the most complete / reliable address field available
-  const dest =
-    (r.destination_display || '').trim() ||
-    (r.full_address || '').trim() ||
-    (r.destination  || '').trim() ||
-    (r.street_address || '').trim() ||
-    (r.address      || '').trim() ||
-    // last resort: build from pieces if present
-    [r.address, r.city, r.province, r.postal_code].filter(Boolean).join(', ').trim() ||
-    '';
+  const dest = String(pickField(r, APP_META.jobsCanonical.address, '') || '').trim() ||
+    [r.address, r.city, r.province, r.postal_code].filter(Boolean).join(', ').trim();
 
-  // Prefer best map link field available
-  const mapUrl =
-    (r.map_url_display || '').trim() ||
-    (r.map_url || '').trim() ||
-    (r.google_maps_link || '').trim() ||
-    (r.url || '').trim() ||
-    '';
+  const mapUrl = String(pickField(r, APP_META.jobsCanonical.mapUrl, '') || '').trim();
+
+  const workOrder = String(pickField(r, APP_META.jobsCanonical.workOrder, '') || '').trim();
+  const siteValue = String(pickField(r, APP_META.jobsCanonical.site, '') || '').trim();
 
   return {
-    client: r.client || r.client_name || '',
-    site: r.prov_site || r.site_name || r.site || '',
-    wo: r.order_number || r.wo || '',
+    client: String(pickField(r, APP_META.jobsCanonical.client, '') || ''),
+    site: siteValue,
+    site_id: r.site_id || r.site || r.prov_site || '',
+    wo: workOrder,
     province: r.province || '',
-    region: r.region || r.admin_region || '',
+    region: String(pickField(r, APP_META.jobsCanonical.city, '') || ''),
     destination: dest,
     url: mapUrl,
-    plage: r.slot || r.plage || '',
-    tech: r.effective_tech || r.resolved_tech || r.tech_name || 'UNASSIGNED',
+    plage: String(pickField(r, APP_META.jobsCanonical.slot, 'AM') || 'AM'),
+    tech: String(pickField(r, APP_META.jobsCanonical.tech, 'UNASSIGNED') || 'UNASSIGNED'),
+    job_desc: r.job_desc || '',
     _db_id: r.id
   };
 }
@@ -611,6 +652,11 @@ Tech priority: <b>Adil</b> → <b>Abdel</b>. Capacity: 1 AM + 1 PM per tech/day.
     <input id="fileImportJobsCsv" type="file" accept=".csv,text/csv" style="display:none"/>
     
     <button class="primary" id="btnAddJob" type="button">Add job</button>
+    <button class="reset" id="btnPlanGenerate" type="button">Generate plan</button>
+    <button class="reset" id="btnPlanOptimize" type="button">Optimize routes</button>
+    <button class="reset" id="btnPlanCompare" type="button">Compare scenario</button>
+    <button class="reset" id="btnPlanApply" type="button">Apply scenario</button>
+    <button class="reset" id="btnPlanExport" type="button">Export scenario CSV</button>
     <button class="reset" id="btnExportAllJson" type="button">Export ALL JSON (jobs + overrides)</button>
     <button class="reset" id="btnImportAllJson" type="button">Import ALL JSON (jobs + overrides)</button>
     <input id="fileImportAll" type="file" accept="application/json,.json" style="display:none"/>
@@ -652,7 +698,7 @@ Tech priority: <b>Adil</b> → <b>Abdel</b>. Capacity: 1 AM + 1 PM per tech/day.
         <input id="aj_site" type="text" placeholder="QC-1234"/>
       </label>
 
-      <label>Order Number
+      <label>Work Order
         <input id="aj_wo" type="text" placeholder="(optional)"/>
       </label>
       <label>Province
@@ -703,6 +749,29 @@ Tech priority: <b>Adil</b> → <b>Abdel</b>. Capacity: 1 AM + 1 PM per tech/day.
     <div class="modal-footer">
       <button class="reset" id="btnAddJobCancel" type="button">Cancel</button>
       <button class="primary" id="btnAddJobConfirm" type="button">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- Planning Scenario Modal -->
+<div id="planScenarioModal" class="modal" style="display:none" aria-hidden="true">
+  <div class="modal-backdrop" id="planScenarioBackdrop"></div>
+  <div class="modal-dialog" role="dialog" aria-modal="true" aria-label="Planning scenario">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Planning scenario</div>
+        <div class="modal-subtitle">Preview optimized date/slot/tech changes before applying.</div>
+      </div>
+      <button type="button" class="reset" id="btnClosePlanScenario">Close</button>
+    </div>
+    <div class="modal-body">
+      <div id="planScenarioMeta" class="planMeta"></div>
+      <div id="planScenarioWarnings" class="small planWarn"></div>
+      <div id="planScenarioResults"></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="reset" id="btnPlanApplyFromModal">Apply scenario</button>
+      <button type="button" class="reset" id="btnPlanExportFromModal">Export CSV</button>
     </div>
   </div>
 </div>
@@ -1594,7 +1663,7 @@ function addJobToBaseMonths(job, iso){
 function exportJobsCsv(){
   rebuildMonthsFromOverrides();
   const rows=[[
-    "Client","Prov-Site","Order Number","Province","City","Address","Date Scheduled","Start Time","Tech Assigned","Google Maps Link"
+    "Client","Prov-Site","Work Order","Province","City","Address","Date Scheduled","Start Time","Tech Assigned","Google Maps Link"
   ]];
   const all=[];
   for(const mid of Object.keys(payload.months)){
@@ -1633,7 +1702,7 @@ function importJobsCsv(file){
     const idx = (name)=> header.findIndex(h=>h.toLowerCase()===name.toLowerCase());
     const iClient=idx("Client");
     const iSite=idx("Prov-Site");
-    const iWO=idx("Order Number");
+    const iWO=idx("Work Order")>=0 ? idx("Work Order") : idx("Order Number");
     const iProv=idx("Province");
     const iCity=idx("City");
     const iAddr=idx("Address");
@@ -1699,7 +1768,7 @@ function importJobsCsv(file){
         url,
         destination,
         unassigned: tech==='UNASSIGNED',
-        raw: {city, address: addr, prov_site: site, order_number: wo}
+        raw: {city, address: addr, prov_site: site, order_number: wo, work_order: wo}
       };
       addJobToBaseMonths(job, iso);
       added++;
@@ -1757,6 +1826,305 @@ document.getElementById('btnExportJobsCsv')?.addEventListener('click', exportJob
 document.getElementById('btnImportJobsCsv')?.addEventListener('click', ()=>pickFile('.csv,text/csv', importJobsCsv));
 document.getElementById('btnExportAllJson')?.addEventListener('click', exportAllJson);
 document.getElementById('btnImportAllJson')?.addEventListener('click', ()=>pickFile('.json,application/json', importAllJson));
+
+// ---------------- Planner / Optimizer (admin only) ----------------
+let __planScenario = null;
+const plannerSettings = {
+  defaultPriority: ['Adil','Abdel','Tech A'],
+  aprilPriority: ['Adil','Abdel','Tech A','Chadi'],
+  maxPerDay: 2,
+  cityClusterWeight: 12,
+  regionClusterWeight: 8,
+  dateShiftWeight: 40,
+  slotChangePenalty: 5,
+  techChangePenalty: 10,
+  unassignedPenalty: 1000,
+  windowDays: 2
+};
+
+function requireAdminAction(){
+  if(!window.IS_ADMIN){
+    alert('Admin only action.');
+    return false;
+  }
+  return true;
+}
+
+function toDateObj(iso){
+  const d = new Date(`${iso}T00:00:00`);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function isoAddDays(iso, days){
+  const d = toDateObj(iso);
+  if(!d) return iso;
+  d.setDate(d.getDate()+days);
+  return d.toISOString().slice(0,10);
+}
+
+function normText(s){ return String(s||'').trim().toLowerCase(); }
+
+function monthNum(iso){ return parseInt(String(iso||'').slice(5,7),10)||0; }
+
+function cityNearHq(city){
+  const c = normText(city);
+  return c.includes('laval') || c.includes('montreal') || c.includes('st-laurent') || c.includes('longueuil') || c.includes('brossard');
+}
+
+async function loadTechUnavailability(){
+  if(!window.sb) return [];
+  try{
+    const { data, error } = await window.sb
+      .from('tech_unavailability')
+      .select('tech_name,start_date,end_date,is_active')
+      .eq('is_active', true);
+    if(error) return [];
+    return Array.isArray(data) ? data : [];
+  }catch(e){
+    return [];
+  }
+}
+
+function isTechUnavailable(tech, iso, unavailable){
+  return unavailable.some(u =>
+    (u.tech_name||'') === tech &&
+    (!u.start_date || u.start_date <= iso) &&
+    (!u.end_date || u.end_date >= iso)
+  );
+}
+
+function techPriorityForDate(iso, unavailable){
+  const base = (monthNum(iso)===4) ? plannerSettings.aprilPriority.slice() : plannerSettings.defaultPriority.slice();
+  return base.filter(t => !isTechUnavailable(t, iso, unavailable));
+}
+
+function collectJobsForPlanning(){
+  rebuildMonthsFromOverrides();
+  const jobs=[];
+  for(const mid of Object.keys(payload.months||{})){
+    const m = payload.months[mid];
+    for(const iso of Object.keys(m.date_index||{})){
+      for(const it of (m.date_index[iso]||[])){
+        const k = jobKey(it, iso);
+        if(cancelOverrides[k]) continue;
+        jobs.push({
+          key:k,
+          iso,
+          tech:(techOverrides[k]||it.tech||'UNASSIGNED'),
+          slot:(plageOverrides[k]||it.plage||''),
+          city:(it.region || it.raw?.city || ''),
+          region:(it.region || it.raw?.city || ''),
+          wo:it.wo||'',
+          site:it.site||'',
+          locked:isManualLocked(k),
+          item:it
+        });
+      }
+    }
+  }
+  jobs.sort((a,b)=>a.iso.localeCompare(b.iso)||a.city.localeCompare(b.city));
+  return jobs;
+}
+
+function makeScheduleIndex(jobs){
+  const idx={};
+  const add=(iso,tech,slot,city,region)=>{
+    if(!iso||!tech||!slot) return;
+    if(!idx[iso]) idx[iso]={};
+    if(!idx[iso][tech]) idx[iso][tech]={AM:0,PM:0,cityCount:{},regionCount:{}};
+    idx[iso][tech][slot] = (idx[iso][tech][slot]||0)+1;
+    const c = city||'';
+    const r = region||'';
+    idx[iso][tech].cityCount[c] = (idx[iso][tech].cityCount[c]||0)+1;
+    idx[iso][tech].regionCount[r] = (idx[iso][tech].regionCount[r]||0)+1;
+  };
+  jobs.forEach(j=>{ if(j.locked) add(j.iso, j.tech, j.slot||'AM', j.city, j.region); });
+  return { idx, add };
+}
+
+function scorePlacement(job, candIso, candTech, candSlot, index, optimize){
+  let s = 0;
+  const dateShift = Math.abs((toDateObj(candIso)-toDateObj(job.iso))/86400000);
+  s += dateShift * plannerSettings.dateShiftWeight;
+  if(candTech==='UNASSIGNED') s += plannerSettings.unassignedPenalty;
+  if(candSlot !== (job.slot||'AM')) s += plannerSettings.slotChangePenalty;
+  if(candTech !== job.tech) s += plannerSettings.techChangePenalty;
+
+  const cell = index[candIso]?.[candTech];
+  const cityN = cell?.cityCount?.[job.city] || 0;
+  const regN = cell?.regionCount?.[job.region] || 0;
+  s -= cityN * plannerSettings.cityClusterWeight;
+  s -= regN * plannerSettings.regionClusterWeight;
+
+  if(!optimize) s += dateShift*20;
+  if(cityNearHq(job.city) && dateShift>0) s += 4;
+  return s;
+}
+
+function feasible(index, iso, tech, slot){
+  if(tech==='UNASSIGNED') return true;
+  const cell = index[iso]?.[tech];
+  const taken = cell ? (cell[slot]||0) : 0;
+  if(taken>=1) return false;
+  const total = cell ? ((cell.AM||0)+(cell.PM||0)) : 0;
+  return total < plannerSettings.maxPerDay;
+}
+
+function computePlanScenario(jobs, unavailable, optimize){
+  const { idx, add } = makeScheduleIndex(jobs);
+  const changes=[];
+  const warnings=[];
+  const unlocked = jobs.filter(j=>!j.locked);
+
+  for(const job of unlocked){
+    const currentSlot = job.slot || 'AM';
+    const slots = currentSlot ? [currentSlot, (currentSlot==='AM'?'PM':'AM')] : ['AM','PM'];
+    const dateOffsets = optimize
+      ? [-plannerSettings.windowDays,-1,0,1,plannerSettings.windowDays]
+      : [0];
+    let best = { score: Number.POSITIVE_INFINITY, iso:job.iso, tech:job.tech, slot:currentSlot };
+
+    for(const off of dateOffsets){
+      const candIso = isoAddDays(job.iso, off);
+      const priority = techPriorityForDate(candIso, unavailable);
+      const techCandidates = priority.concat(['UNASSIGNED']);
+      for(const candTech of techCandidates){
+        for(const candSlot of slots){
+          if(!feasible(idx, candIso, candTech, candSlot)) continue;
+          const sc = scorePlacement(job, candIso, candTech, candSlot, idx, optimize);
+          if(sc < best.score){
+            best = { score:sc, iso:candIso, tech:candTech, slot:candSlot };
+          }
+        }
+      }
+    }
+
+    const changed = (best.iso!==job.iso) || (best.tech!==job.tech) || (best.slot!==currentSlot);
+    if(changed){
+      changes.push({
+        key:job.key,
+        wo:job.wo,
+        site:job.site,
+        city:job.city,
+        oldIso:job.iso,
+        newIso:best.iso,
+        oldTech:job.tech,
+        newTech:best.tech,
+        oldSlot:currentSlot,
+        newSlot:best.slot,
+        score:best.score
+      });
+    }
+    add(best.iso, best.tech, best.slot, job.city, job.region);
+  }
+
+  const unassigned = changes.filter(c=>c.newTech==='UNASSIGNED').length;
+  if(unassigned>0) warnings.push(`${unassigned} jobs remain UNASSIGNED after planning.`);
+
+  return {
+    createdAt:new Date().toISOString(),
+    optimize:!!optimize,
+    totalJobs:jobs.length,
+    changed:changes.length,
+    changes,
+    warnings
+  };
+}
+
+function renderPlanScenarioModal(){
+  const modal = document.getElementById('planScenarioModal');
+  const meta = document.getElementById('planScenarioMeta');
+  const warn = document.getElementById('planScenarioWarnings');
+  const out = document.getElementById('planScenarioResults');
+  if(!modal || !meta || !warn || !out) return;
+  if(!__planScenario){
+    out.innerHTML = '<div class="small">No scenario generated yet.</div>';
+    meta.innerHTML = '';
+    warn.textContent = '';
+  }else{
+    const s = __planScenario;
+    meta.innerHTML = `
+      <span class="planBadge">Mode: ${s.optimize ? 'Optimize routes' : 'Generate plan'}</span>
+      <span class="planBadge">Jobs: ${s.totalJobs}</span>
+      <span class="planBadge">Changes: ${s.changed}</span>
+      <span class="planBadge">Built: ${new Date(s.createdAt).toLocaleString()}</span>
+    `;
+    warn.textContent = s.warnings.join(' ');
+    const rows = s.changes.slice(0,300).map(c=>`
+      <tr>
+        <td>${c.wo||''}</td>
+        <td>${c.site||''}</td>
+        <td>${c.city||''}</td>
+        <td>${c.oldIso}</td>
+        <td>${c.newIso}</td>
+        <td>${c.oldSlot}</td>
+        <td>${c.newSlot}</td>
+        <td>${c.oldTech}</td>
+        <td>${c.newTech}</td>
+      </tr>
+    `).join('');
+    out.innerHTML = `
+      <table class="resultsTable">
+        <thead>
+          <tr><th>WO</th><th>Site</th><th>City</th><th>Old date</th><th>New date</th><th>Old slot</th><th>New slot</th><th>Old tech</th><th>New tech</th></tr>
+        </thead>
+        <tbody>${rows || '<tr><td colspan="9">No changes suggested.</td></tr>'}</tbody>
+      </table>
+    `;
+  }
+  modal.style.display='block';
+  modal.setAttribute('aria-hidden','false');
+}
+
+function closePlanScenarioModal(){
+  const modal = document.getElementById('planScenarioModal');
+  if(!modal) return;
+  modal.style.display='none';
+  modal.setAttribute('aria-hidden','true');
+}
+
+function applyPlanScenario(){
+  if(!requireAdminAction()) return;
+  if(!__planScenario){ alert('Generate or optimize a scenario first.'); return; }
+  for(const c of __planScenario.changes){
+    if(c.newIso!==c.oldIso) setDateOverride(c.key, c.newIso); else clearDateOverride(c.key);
+    if(c.newTech!==c.oldTech) setTechOverride(c.key, c.newTech); else clearTechOverride(c.key);
+    if(c.newSlot!==c.oldSlot) setPlageOverride(c.key, c.newSlot); else clearPlageOverride(c.key);
+  }
+  rerenderActive();
+  alert(`Scenario applied: ${__planScenario.changes.length} job changes.`);
+}
+
+function exportPlanScenarioCsv(){
+  if(!requireAdminAction()) return;
+  if(!__planScenario){ alert('No scenario to export.'); return; }
+  const rows = [[
+    'WO','Site','City','Old Date','New Date','Old Slot','New Slot','Old Tech','New Tech'
+  ]];
+  __planScenario.changes.forEach(c=>rows.push([
+    c.wo||'', c.site||'', c.city||'', c.oldIso, c.newIso, c.oldSlot, c.newSlot, c.oldTech, c.newTech
+  ]));
+  const csv = rows.map(r=>r.map(csvEscape).join(',')).join('\n');
+  downloadText(`scenario_${payload.year}_${__planScenario.optimize?'optimized':'planned'}.csv`, csv, 'text/csv;charset=utf-8');
+}
+
+async function runPlanScenario(optimize){
+  if(!requireAdminAction()) return;
+  const jobs = collectJobsForPlanning();
+  const unavailable = await loadTechUnavailability();
+  __planScenario = computePlanScenario(jobs, unavailable, !!optimize);
+  renderPlanScenarioModal();
+}
+
+document.getElementById('btnPlanGenerate')?.addEventListener('click', ()=>runPlanScenario(false));
+document.getElementById('btnPlanOptimize')?.addEventListener('click', ()=>runPlanScenario(true));
+document.getElementById('btnPlanCompare')?.addEventListener('click', ()=>{ if(requireAdminAction()) renderPlanScenarioModal(); });
+document.getElementById('btnPlanApply')?.addEventListener('click', applyPlanScenario);
+document.getElementById('btnPlanExport')?.addEventListener('click', exportPlanScenarioCsv);
+document.getElementById('btnClosePlanScenario')?.addEventListener('click', closePlanScenarioModal);
+document.getElementById('planScenarioBackdrop')?.addEventListener('click', closePlanScenarioModal);
+document.getElementById('btnPlanApplyFromModal')?.addEventListener('click', applyPlanScenario);
+document.getElementById('btnPlanExportFromModal')?.addEventListener('click', exportPlanScenarioCsv);
 
 // ---------------- Manual jobs (localStorage) ----------------
 const manualJobsKey = 'dispatch_manual_jobs_v1';
@@ -2424,12 +2792,14 @@ function setEditModeUI(){
     "btnExportJobsCsv", "btnImportJobsCsv",
     "btnExportAllJson", "btnImportAllJson",
     "btnAddJob",
+    "btnPlanGenerate", "btnPlanOptimize", "btnPlanCompare", "btnPlanApply", "btnPlanExport",
 
     // file inputs for imports
     "fileImportOverrides", "fileImportJobsCsv", "fileImportAll",
 
     // add-job modal controls
     "btnCloseAddJob", "btnAddJobCancel", "btnAddJobConfirm",
+    "btnClosePlanScenario", "btnPlanApplyFromModal", "btnPlanExportFromModal",
     "aj_client","aj_site","aj_wo","aj_province","aj_city","aj_address","aj_date","aj_plage","aj_tech","aj_keepOpen"
   ];
 
@@ -2599,6 +2969,11 @@ async function doLogin(e) {
     window.USE_DB_JOBS = true;                 // ✅ ADD
     window.IS_ADMIN = await dbIsAdmin();       // ✅ ADD (must be AFTER sign-in)
     window.CAN_EDIT = window.IS_ADMIN;
+    const schema = await dbValidateRuntimeSchema();
+    if(!schema.ok && window.IS_ADMIN){
+      console.warn('[schema] runtime schema mismatch:', schema.missing);
+      $("authStatus").textContent += " | Schema warning";
+    }
     
     __enterDbModeClean();
 
@@ -2632,6 +3007,11 @@ if (window.paintBuildBadge) window.paintBuildBadge();
     window.USE_DB_JOBS = true;
     window.IS_ADMIN = await dbIsAdmin();       // ✅ ADD
     window.CAN_EDIT = window.IS_ADMIN;
+    const schema = await dbValidateRuntimeSchema();
+    if(!schema.ok && window.IS_ADMIN){
+      console.warn('[schema] runtime schema mismatch:', schema.missing);
+      $("authStatus").textContent += " | Schema warning";
+    }
     __enterDbModeClean();                      // ✅ ADD (recommended for consistency)
 
     try {

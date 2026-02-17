@@ -1,0 +1,428 @@
+﻿prov_site,job_desc,site_id,work_order,client,province,city,address,postal_code,date_scheduled_raw,start_time_raw
+QC-105097,Cradlepoint Only,105097,504248,GOCO,QC,Montreal,5405 Boul Decarie ,H3W 3C5,19-Jan,9am
+QC-105828,Cradlepoint Only,105828,504241,GOCO,QC,St-Laurent,"3131 COTE Vertu, Unit M9",H4R 1Y8,19-Jan,9am
+QC-101292,Cradlepoint Only,101292,504254,GOCO,QC,Montreal,5180 boul. Decarie ,H3X 2H9,20-Jan,9am
+QC-102717,Cradlepoint Only,102717,504258,GOCO,QC,Montreal,2160 boul. Decarie ,H4A 3J3,20-Jan,12pm
+QC-102778,Cradlepoint Only,102778,504270,GOCO,QC,Montreal,6500 Cote St-Luc ,H4V 1G2,21-Jan,9am
+QC-100133,Cradlepoint Only,100133,504282,GOCO,QC,Laval,489 boul. Des Laurentides ,H7G 2V2,22-Jan,12pm
+QC-103013,Cradlepoint Only,103013,504287,GOCO,QC,Laval,3099 de la Concorde Est ,H7E 2C1,22-Jan,9am
+QC-103370,Cradlepoint Only,103370,504295,GOCO,QC,Laval,650 Boulverad des Laurentides ,H7G 2V9,23-Jan,9am
+QC-103407,Cradlepoint Only,103407,504297,GOCO,QC,Laval,"5700, boul des Laurentides ",H7K 2K2,23-Jan,12pm
+QC-102935,Cradlepoint Only,102935,504310,GOCO,QC,Laval,1664 boul. Des Laurentide ,H7M 2P4,26-Jan,9am
+QC-105591,Cradlepoint Only,105591,504308,GOCO,QC,Laval,1895 Boulevard Rene Laennec Unit 301,H7M 5E2,26-Jan,12pm
+QC-102328,Cradlepoint Only,102328,504328,GOCO,QC,Laval,3557 boul. Dagenais Ouest #23 Place Fabreville,H7P 1V8,27-Jan,12pm
+QC-103179,Cradlepoint Only,103179,504318,GOCO,QC,Laval,1340 boul. Le Corbusier local C2 ,H7N 6J5,27-Jan,9am
+QC-104427,Cradlepoint Only,104427,504337,GOCO,QC,Laval,460 BD Cure Labelle ,H7P 2P1,28-Jan,9am
+QC-104966,Cradlepoint Only,104966,504336,GOCO,QC,Laval,1845 Boul St. Martin Ouest ,H7S 1N2,28-Jan,12pm
+QC-103924,Cradlepoint Only,103924,504351,GOCO,QC,Laval,"2305, Industriel ",H7S 1P8,29-Jan,9am
+QC-106029,Cradlepoint Only,106029,504345,GOCO,QC,Laval,3035 Boul Le Carrefour ,h7t 1c8,29-Jan,12pm
+QC-102468,Cradlepoint Only,102468,504364,GOCO,QC,Laval,2145 boul. Cure-Labelle ,H7T 1L4,30-Jan,9am
+QC-101721,Cradlepoint Only,101721,507198,GOCO,QC,Laval,1440 boul. Cure-Labelle ,H7V 2W1,2-Feb,9am
+QC-104423,Cradlepoint Only,104423,507348,GOCO,QC,Dollard-des-Ormeaux,1350 Sunnybrooke ,H9B 2W5,2-Feb,12pm
+QC-102843,Cradlepoint Only,102843,507403,GOCO,QC,Dollard-des-Ormeaux,3580 boul. St-Jean ,H9G 1W8,3-Feb,9am
+QC-104961,Cradlepoint Only,104961,507448,GOCO,QC,Saint Jean Sur Richelieu,78 Chemin Des Patriotes ,J2X 5P9,3-Feb,12pm
+QC-101808,Cradlepoint Only,101808,507321,GOCO,QC,Pierrefonds,3862 boul. St-Charles ,H9H 3C3,4-Feb,9am
+QC-103438,Cradlepoint Only,103438,507401,GOCO,QC,Montreal,"14810, boul Pierrefonds ",H9H 4Y6,4-Feb,12pm
+QC-102431,Cradlepoint Only,102431,507180,GOCO,QC,Kirkland,3140 rue Jean-Yves ,H9J 2R6,5-Feb,12pm
+QC-108487,Cradlepoint Only,108487,506802,GOCO,QC,Pierrefonds,4750 Boulevard Saint-Jean ,H9H 5G9,5-Feb,9am
+QC-102858,Cradlepoint Only,102858,507406,GOCO,QC,St-Laurent,2323 boul. Marcel-Laurin Galeries St-Laurent Shopping Centre ,H4R 1K4,6-Feb,9am
+QC-100762,Cradlepoint Only,100762,507382,GOCO,QC,Pointe-Claire,183G boul. Hymus ,H9R 1E9,9-Feb,12pm
+QC-102720,Cradlepoint Only,102720,507409,GOCO,QC,Dorval,2380 boul. Hymus ,H9P 1J9,9-Feb,9am
+QC-103366,Cradlepoint Only,103366,507457,GOCO,QC,Dorval,395 Avenue Dorval ,H9S3H6,10-Feb,9am
+QC-104942,Cradlepoint Only,104942,507445,GOCO,QC,St Jean Sur Richelieu,415 Rue De Carillon ,J3B 7P5,10-Feb,12pm
+QC-100751,Cradlepoint Only,100751,507282,GOCO,QC,Anjou,7150 rue Jarry Est ,H1J 1G5,11-Feb,9am
+QC-102671,Cradlepoint Only,102671,507265,GOCO,QC,Anjou,9201 boul. Metropolitain ,H1J 1K2,11-Feb,12pm
+QC-103636,Cradlepoint Only,103636,507353,GOCO,QC,Anjou,10005 Louis H. La fontaine ,H1J2M5,12-Feb,9am
+QC-105403,Cradlepoint Only,105403,507150,GOCO,QC,Carignan,1495 Chemin Chambly ,J3L 0J6,12-Feb,12pm
+QC-100602,Cradlepoint Only,100602,507215,GOCO,QC,Chambly,697 rue Lariviere ,J3L 1L4,13-Feb,12pm
+QC-102429,Cradlepoint Only,102429,507183,GOCO,QC,St-Laurent,7895 chemin de la Cete de Liesse ,H4T 1G2,13-Feb,9am
+QC-100703,Cradlepoint Only,100703,507419,GOCO,QC,Brossard,1155 boul Rome ,J4W 3J1,16-Feb,9am
+QC-104751,Cradlepoint Only,104751,507395,GOCO,QC,Brossard,7500 BD Taschereau Esso,J4X 1C2,16-Feb,12pm
+QC-103645,Cradlepoint Only,103645,507354,GOCO,QC,Brossard,"8700 Blvd. Leduc, suite 10 ",J4Y 0G4,17-Feb,9am
+QC-106027,Cradlepoint Only,106027,507139,GOCO,QC,Brossard,8075 boul. Du Quartier Suite 102,J4Y0N5,17-Feb,12pm
+QC-101229,Cradlepoint Only,101229,507300,GOCO,QC,Brossard,5525 av. Auteuil ,J4Z 1M3,18-Feb,12pm
+QC-102690,Cradlepoint Only,102690,507173,GOCO,QC,Brossard,6598 boul. Taschereau ,J4Z 1A7,18-Feb,9am
+QC-100328,Cradlepoint Only,100328,507284,GOCO,QC,Longueuil,825 ch. De Chambly ,J4H 3M2,19-Feb,9am
+QC-102117,Cradlepoint Only,102117,507240,GOCO,QC,Longueuil,310 boul. Roland-Therrien ,J4H 3V9,19-Feb,12pm
+QC-102201,Cradlepoint Only,102201,507468,GOCO,QC,Longueuil,1515 boul. Taschereau ,J4K 2X8,20-Feb,12pm
+QC-102232,Cradlepoint Only,102232,507181,GOCO,QC,Longueuil,120 Place Charles-Le Moyne #400 ,J4K 2T4,20-Feb,9am
+QC-101090,Cradlepoint Only,101090,507210,GOCO,QC,Chateauguay,251-A boul. DAnjou ,J6J 2R4,23-Feb,9am
+QC-101636,Cradlepoint Only,101636,507193,GOCO,QC,Chateauguay,17 boul. St-Jean-Baptiste ,J6J 3H5,23-Feb,12pm
+QC-101385,Cradlepoint Only,101385,,GOCO,QC,Val-d`Or,1690 3e Avenue ,J9P 1W2,23-Feb,12pm
+QC-103129,Cradlepoint Only,103129,507291,GOCO,QC,Chateauguay,262 boul St-Jean-Baptiste ,J6K 3C2,24-Feb,9am
+QC-103372,Cradlepoint Only,103372,507157,GOCO,QC,Mercier,"611, St-Jean Baptiste ",J6R2A8,24-Feb,12pm
+QC-100355,Cradlepoint Only,100355,,GOCO,QC,Amos,31 rue Principale Nord ,J9T 2K7,24-Feb,9am
+QC-100175,Cradlepoint Only,100175,,GOCO,QC,Val-d`Or,1126 7e Rue ,J9P 3R6,24-Feb,9am
+QC-103220,Cradlepoint Only,103220,507161,GOCO,QC,Ste-Catherine,4780 router 132 ,J5C 1V9,25-Feb,12pm
+QC-104522,Cradlepoint Only,104522,507444,GOCO,QC,St-Constant,115 Rue Saint-Pierre ,J5A 2G8,25-Feb,9am
+QC-105886,Cradlepoint Only,105886,,GOCO,QC,Amos,"311, 6E Rue Ouest ",J9T 2V6,25-Feb,12pm
+QC-102522,Cradlepoint Only,102522,507465,GOCO,QC,Lasalle,7077 boul. Newman Local 05050 Carrefour Angrignon,H8N 1X1,26-Feb,9am
+QC-103229,Cradlepoint Only,103229,507158,GOCO,QC,Richelieu,401 boulevard Richelieu ,J3L 3R6,26-Feb,12pm
+QC-100254,Cradlepoint Only,100254,,GOCO,QC,Rouyn-Noranda,4 av. Principale ,J9X 4N9,26-Feb,9am
+QC-103260,Cradlepoint Only,103260,507455,GOCO,QC,Saint-Hubert,1350 rue Edouard ,J4T 3T2,27-Feb,9am
+QC-105076,Cradlepoint Only,105076,507148,GOCO,QC,La prairie,1050 BD Taschereau ,J5R 1W6,27-Feb,12pm
+QC-101129,Cradlepoint Only,101129,,GOCO,QC,La Sarre,"169, 2em Rue Est ",J9Z 2G5,27-Feb,12pm
+QC-106367,Cradlepoint Only,106367,,GOCO,QC,La Sarre,632 - 2e rue LaSarre ,J9Z 2S5,27-Feb,9am
+QC-101151,Cradlepoint & Velocloud,101151,506918,GOCO,QC,Pointe Aux Trembles,12775 rue Sherbrooke Est ,H1A 3V9,2-Mar,12pm
+QC-103758,Cradlepoint & Velocloud,103758,506977,GOCO,QC,Montreal,15550 Rue Sherbrooke E ,H1A 3R1,2-Mar,9am
+QC-104421,Cradlepoint & Velocloud,104421,506981,GOCO,QC,Pointe Aux Trembles,1220 boul Saint-Jean-Baptiste ,H1B 4A4,3-Mar,9am
+QC-104838,Cradlepoint & Velocloud,104838,506832,GOCO,QC,Montreal - Est,10725 Boulevard Henri-Bourassa Est ,H1C 1S9,3-Mar,12pm
+QC-103064,Cradlepoint Only,103064,,GOCO,QC,Drummondville,2279 boul. Mercure ,J2B 3R8,3-Mar,
+QC-105077,Cradlepoint Only,105077,,GOCO,QC,Drummondville,2710 St-Pierre St ,J2C 0P9,3-Mar,
+QC-102477,Cradlepoint & Velocloud,102477,506865,GOCO,QC,Montreal,3611 Blvd Henri-Bourassa E. ,H1H 1J5,4-Mar,12pm
+QC-104469,Cradlepoint & Velocloud,104469,506956,GOCO,QC,Montreal,12451 Rodolphe-Foget bd ,H1E 0A2,4-Mar,9am
+QC-100517,Cradlepoint Only,100517,,GOCO,QC,Drummondville,300 boul. St-Joseph ,J2C 2A8,4-Mar,
+QC-101897,Velocloud Only,101897,506896,GOCO,QC,Montreal,5778 rue Notre-Dame Est ,H1N 2C6,5-Mar,12pm
+QC-102800,Cradlepoint & Velocloud,102800,506874,GOCO,QC,Montreal,7295 boul. Les Galeries d Anjou ,H1M 2W2,5-Mar,9am
+QC-100130,Cradlepoint & Velocloud,100130,,GOCO,QC,Victoriaville,90 boul. Des Bois-Francs Sud ,G6P 4S1,5-Mar,
+QC-102966,Cradlepoint & Velocloud,102966,,GOCO,QC,Becancour,4850 avenue Fardel ,G9H 1V6,5-Mar,
+QC-102589,Cradlepoint & Velocloud,102589,506871,GOCO,QC,Montreal,5005 Jean-Talon Est ,H1S 3G6,6-Mar,12pm
+QC-103881,Cradlepoint & Velocloud,103881,506980,GOCO,QC,Montreal,6245 Métropolitain est ,H1S 1A9,6-Mar,9am
+QC-101920,Cradlepoint & Velocloud,101920,,GOCO,QC,Drummondville,1190 boul. Lemire ,J2C 7W6,6-Mar,12pm
+QC-103063,Cradlepoint & Velocloud,103063,,GOCO,QC,Plessisville,1400 rue eDouard-Dufour ,G6L 5S2,6-Mar,
+QC-101918,Cradlepoint & Velocloud,101918,506901,GOCO,QC,Montreal,9485 boul. St-Laurent ,H2N 1P6,9-Mar,12pm
+QC-104290,Cradlepoint & Velocloud,104290,506976,GOCO,QC,Montreal,3634 Rue Ontario east ,H1W 1R7,9-Mar,9am
+QC-102593,Cradlepoint & Velocloud,102593,506872,GOCO,QC,Montreal,674 Sherbrooke Ouest ,H3A 1E7,10-Mar,9am
+QC-103966,Cradlepoint & Velocloud,103966,506843,GOCO,QC,Montreal,"1508 Rue de Bleury, ",H3A 2J2,10-Mar,12pm
+QC-101575,Cradlepoint & Velocloud,101575,506911,GOCO,QC,Montreal,5985 ch. De La Cete-des-Neiges ,H3S 1Z2,11-Mar,9am
+QC-105858,Cradlepoint & Velocloud,105858,506954,GOCO,QC,Montreal,3600 Notre Dame Ouest ,H4C 1PC,11-Mar,12pm
+QC-101317,Velocloud Only,101317,506916,GOCO,QC,Montreal,9255 boul. De LAcadie ,H4N 3K1,12-Mar,9am
+QC-101860,Velocloud Only,101860,506893,GOCO,QC,Laval,825 boul. Vanier ,H7C 2R3,12-Mar,12pm
+QC-104218,Cradlepoint & Velocloud,104218,506974,GOCO,QC,Laval,"1845, St-Elzear ouest, ",H7L 3N6,13-Mar,12pm
+QC-105920,Velocloud Only,105920,506955,GOCO,QC,Laval,"2475 Boul St-Martin Est, ",H7E 5B4,13-Mar,9am
+QC-102155,Cradlepoint Only,102155,,GOCO,QC,Sherbrooke,1680 rue King Est ,J1G 5G6,16-Mar,
+QC-102776,Cradlepoint & Velocloud,102776,,GOCO,QC,Sherbrooke,4470 boul. Bourque ,J1N 1S3,16-Mar,
+QC-100859,Velocloud Only,100859,506922,GOCO,QC,Vimont,2070 boul. Des Laurentides ,H7M 2R5,16-Mar,9am
+QC-102469,Velocloud Only,102469,506985,GOCO,QC,Laval,"4333, Autoroute 13 ",H7P 4W6,16-Mar,12pm
+QC-102791,Cradlepoint & Velocloud,102791,,GOCO,QC,Sherbrooke,5035 boul. Industriel ,J1R 0P4,17-Mar,
+QC-102999,Cradlepoint Only,102999,,GOCO,QC,Sherbrooke,1785 rue King Ouest ,J1J 2E1,17-Mar,
+QC-100677,Cradlepoint & Velocloud,100677,506923,GOCO,QC,Laval,"5250, Arthur-Sauve ",H7R 3X1,17-Mar,12pm
+QC-102554,Cradlepoint & Velocloud,102554,506867,GOCO,QC,Laval,2910 rue Lucien LAllier ,H7P 6C7,17-Mar,9am
+QC-103619,Cradlepoint Only,103619,,GOCO,QC,Sherbrooke,5986 Chemin de St-Elie ,J1R 0L1,18-Mar,
+QC-103673,Velocloud Only,103673,,GOCO,QC,Sherbrooke,"2015, 12ème Avenue Nord ",J1E 4J5,18-Mar,
+QC-102389,Cradlepoint & Velocloud,102389,506882,GOCO,QC,Laval,3265 boul. St Martin Ouest ,H7T 1S2,18-Mar,12pm
+QC-104523,Cradlepoint & Velocloud,104523,506830,GOCO,QC,Laval,2910 Rue Etienne-Lenoir ,H7R 6J4,18-Mar,9am
+QC-103740,Cradlepoint Only,103740,,GOCO,QC,Sherbrooke,3550 rue Galt ouest ,J1H 0A5,19-Mar,
+QC-104671,Cradlepoint Only,104671,,GOCO,QC,Sherbrooke,4857 Boul Bourque ,J1N 1E8,19-Mar,
+QC-100669,Cradlepoint & Velocloud,100669,506925,GOCO,QC,Lasalle,8481 boul. Newman ,H8N 2Y7,19-Mar,12pm
+QC-102060,Velocloud Only,102060,506900,GOCO,QC,Laval,760 rue Desserte Ouest ,H7X 3S9,19-Mar,9am
+QC-104840,Cradlepoint Only,104840,,GOCO,QC,Magog,2911 Chemin Milletta Local 140,J1X 0R4,20-Mar,
+QC-104855,Cradlepoint Only,104855,,GOCO,QC,Magog,1859 Rue Sherbrooke ,J1X 2T5,20-Mar,
+QC-101200,Cradlepoint & Velocloud,101200,506917,GOCO,QC,Lachine,10592 ch. De La Cete-de-Liesse ,H8T 1A4,20-Mar,12pm
+QC-101815,Cradlepoint & Velocloud,101815,506891,GOCO,QC,Lachine,5 av. St-Pierre ,H8R 1N8,20-Mar,9am
+QC-106272,Cradlepoint Only,106272,,GOCO,QC,Sherbrooke,3050 Boulevard Portland Unit N08a (Carrefour l'Estrie),J1L 1K1,23-Mar,
+QC-106858,Velocloud Only,106858,,GOCO,QC,Sherbrooke,413 Rue Belvédère S ,J1H 4B7,23-Mar,
+QC-103658,Cradlepoint Only,103658,507343,GOCO,QC,Beaconsfield,108 De BeauRepaire ,H9W 0A1,23-Mar,9am
+QC-104194,Cradlepoint Only,104194,507450,GOCO,QC,Vaudreuil Dorion,2909 De La Gare BD ,J7V 9R2,23-Mar,12pm
+QC-104124,Cradlepoint & Velocloud,104124,,GOCO,QC,Richmond,150 Route 116 ,J0B2H0,24-Mar,
+QC-104706,Cradlepoint Only,104706,,GOCO,QC,Windsor,2 Route 249 ,J1S 2T7,24-Mar,
+QC-102929,Cradlepoint Only,102929,507461,GOCO,QC,Ste-Anne-des-Plaines,427 boul. Ste-Anne ,J0N 1H0,24-Mar,12pm
+QC-105574,Cradlepoint Only,105574,507143,GOCO,QC,Mirabel,18205 Boul De Versailles ,J0N 0R6,24-Mar,9am
+QC-103434,Cradlepoint & Velocloud,103434,,GOCO,QC,Coaticook,237 Main Est ,J1A 1N4,25-Mar,
+QC-102251,Cradlepoint Only,102251,507467,GOCO,QC,Ste-Marthe-sur-le-Lac,3003 ch. DOka suite 200 ,J0N 1P0,25-Mar,9am
+QC-104392,Cradlepoint Only,104392,507453,GOCO,QC,St-Joseph-du-Lac,3786 CH d'Oka ,J0N1M0,25-Mar,12pm
+QC-104737,Cradlepoint Only,104737,507149,GOCO,QC,Repentigny,225 Rue St Paul ,J5Z2H9,26-Mar,9am
+QC-105091,Cradlepoint & Velocloud,105091,506966,GOCO,QC,Repentigny,457 Boul. Lacombe ,J5Z 1P2,26-Mar,12pm
+QC-100699,Cradlepoint Only,100699,507301,GOCO,QC,Repentigny,111 boul. Industriel ,J6A 4X5,27-Mar,9am
+QC-100430,Cradlepoint & Velocloud,100430,506934,GOCO,QC,Repentigny,85 boul. Brien ,J6A 8B6,30-Mar,12pm
+QC-103503,Cradlepoint Only,103503,507165,GOCO,QC,Terrebonne,1157 Montée des Pionniers ,J6V1P1,30-Mar,9am
+QC-101085,Cradlepoint Only,101085,507209,GOCO,QC,Terrebonne,2980 ch. Gascon ,J6X 3Z3,31-Mar,9am
+QC-103498,Cradlepoint Only,103498,507164,GOCO,QC,Terrebonne,"2795, BOUL. DES PLATEAUX ",J6X 4S8,31-Mar,12pm
+QC-101852,Cradlepoint Only,101852,504116,GOCO,QC,Montreal,7950 boul. Henri-Bourassa Est ,H1E 1P2,1-Apr,9am
+QC-102379,Cradlepoint Only,102379,504068,GOCO,QC,Montreal,6130 boul. Henri Bourassa Est ,H1G 5X3,1-Apr,9am
+QC-102221,Cradlepoint Only,102221,504125,GOCO,QC,Montreal,10433 boul. Pie-IX ,H1H 3Z9,1-Apr,
+QC-103650,Cradlepoint Only,103650,504123,GOCO,QC,Montreal,"3881, Sherbrooke Est ",H1X 2A5,1-Apr,9am
+QC-102421,Cradlepoint Only,102421,504146,GOCO,QC,Montreal,8100 boul. Pie IX ,H1Z 4P1,1-Apr,9am
+QC-100265,Cradlepoint & Velocloud,100265,,GOCO,QC,Montreal,8055 boul. St-Michel ,H1Z 3C9,1-Apr,9am
+QC-101877,Cradlepoint Only,101877,504147,GOCO,QC,Montreal,8115 av. Papineau ,H2E 2H7,2-Apr,9am
+QC-100255,Cradlepoint Only,100255,504155,GOCO,QC,Montreal,2460 rue Dandurand ,H2G 2A3,2-Apr,9am
+QC-101534,Cradlepoint Only,101534,504151,GOCO,QC,Montreal,790 boul. Cremazie Est ,H2P 1G3,2-Apr,9am
+QC-107262,Cradlepoint Only,107262,504165,GOCO,QC,Montreal,93 Ste-Catherine W ,H2X 1Z6,2-Apr,9am
+QC-101145,Cradlepoint Only,101145,504183,GOCO,QC,St-Laurent,1191 boul. Decarie ,H4L 3M8,2-Apr,9am
+QC-102515,Cradlepoint Only,102515,504189,GOCO,QC,Montreal,625 rue Ste-Catherine Ouest suite 1370 Promendaes de la Cath?drale ,H3B 1B7,2-Apr,9am
+QC-105095,Cradlepoint Only,105095,504171,GOCO,QC,Montreal,2035 rue Stanley ,H3A 1R7,1-Apr,9am
+QC-102979,Cradlepoint Only,102979,504199,GOCO,QC,Montreal,2021 avenue Union ,H3A 2S9,1-Apr,9am
+QC-102093,Cradlepoint Only,102093,504205,GOCO,QC,Montreal,605 boul. Rene-Levesque Ouest ,H3B 1P4,2-Apr,9am
+QC-104746,Cradlepoint Only,104746,504213,GOCO,QC,Montreal,1611 Ste-Catherine ouest ,H3H 1L8,2-Apr,9am
+QC-101436,Cradlepoint Only,101436,504216,GOCO,QC,Montreal,2081 rue Guy ,H3H 2L9,7-Apr,9am
+QC-103410,Cradlepoint Only,103410,504230,GOCO,QC,Montreal,2912 De Salaberry street ,H3M 1L3,7-Apr,9am
+QC-102206,Cradlepoint Only,102206,504234,GOCO,QC,Montreal,117A - 4819 av. Van Horne ,H3W 1J2,6-Apr,9am
+QC-102760,Cradlepoint Only,102760,,GOCO,QC,La Plaine,5481 boul. Laurier ,H7M 1C3,6-Apr,
+QC-103937,Cradlepoint & Velocloud,103937,,GOCO,QC,Mascouche,3106 Ch Sainte-Marie ,J7K 1P4,6-Apr,
+QC-105509,Cradlepoint Only,105509,,GOCO,QC,Saint Lin Laurentides,Rte. 355 et du Marche ,J5M 2G4,6-Apr,
+QC-106043,Cradlepoint Only,106043,,GOCO,QC,L`Epiphanie,199 Rue Payette ,J5X 4A7,6-Apr,
+QC-103717,Cradlepoint Only,103717,504175,GOCO,QC,St-Leonard,9464 Bd Lacordaire ,H1R 3N3,7-Apr,9am
+QC-101618,Cradlepoint Only,101618,,GOCO,QC,St-Jean-sur-Richelieu,234 boul. St-Luc ,J2W 1C2,7-Apr,9am
+QC-106364,Cradlepoint Only,106364,420888,GOCO,QC,Napierville,170 Bd Industriel #100 ,J0J 1L0,7-Apr,9am
+QC-102884,Cradlepoint Only,102884,,GOCO,QC,St-Jean-sur-Richelieu,180 Omer-Marcil ,J2W 2V1,7-Apr,9am
+QC-104835,Cradlepoint Only,104835,,GOCO,QC,St-Jean-sur-Richelieu,400 boulevard Croisetiere Nord Corner route 104,J2X 0E5,7-Apr,12pm
+QC-102038,Cradlepoint & Velocloud,102038,,GOCO,QC,Longueuil,2695 ch. De Chambly ,J4L 1M3,7-Apr,12pm
+QC-101678,Cradlepoint & Velocloud,101678,,GOCO,QC,Longueuil,1375 boul. Cure-Poirier Ouest ,J4K 5K4,8-Apr,12pm
+QC-102248,Cradlepoint & Velocloud,102248,,GOCO,QC,Longueuil,895 rue St-Laurent Ouest Place Longueuil,J4K 2V1,8-Apr,9am
+QC-104158,Cradlepoint & Velocloud,104158,,GOCO,QC,Longueuil,"1225, boul, Jacques Cartier ",J4K2T4,8-Apr,9am
+QC-105267,Cradlepoint & Velocloud,105267,,GOCO,QC,Longueuil,2836 Chemin Chambly ,J4L 1M6,8-Apr,9am
+QC-100475,Cradlepoint Only,100475,,GOCO,QC,Saint-Hubert,6250 boul. Cousineau Unit 300,J3Y 8X9,8-Apr,12pm
+QC-102391,Cradlepoint Only,102391,,GOCO,QC,Saint-Hubert,1220 boul. Des Promenades ,J3Y 5K2,8-Apr,9am
+QC-101025,Cradlepoint & Velocloud,101025,,GOCO,QC,Brossard,2141 boul. Lapiniere ,J4W 1L7,9-Apr,9am
+QC-103371,Cradlepoint & Velocloud,103371,,GOCO,QC,Brossard,8270 Boulevard Taschreau ,J4X 1C2,9-Apr,12pm
+QC-103045,Cradlepoint & Velocloud,103045,,GOCO,QC,Brossard,7305 boulevard Grande-Allee ,J4Z 0E3,9-Apr,9am
+QC-105221,Cradlepoint & Velocloud,105221,,GOCO,QC,Greenfield Park,3319 Tachereau Boulevard ,J4V 2H5,9-Apr,12pm
+QC-103158,Cradlepoint & Velocloud,103158,,GOCO,QC,Candiac,400 Rue Strasbourg ,J5R 0B4,9-Apr,
+QC-103659,Cradlepoint & Velocloud,103659,,GOCO,QC,Boucherville,1560 boul. de Montarville ,J3V 5J8,9-Apr,12pm
+QC-102026,Cradlepoint Only,102026,,GOCO,QC,Mont-St-Hilaire,10 rue Brunet ,J3G 4S6,10-Apr,
+QC-100125,Cradlepoint Only,100125,,GOCO,QC,Boucherville,511 rue Samuel-De-Champlain ,J4B 6B6,10-Apr,9am
+QC-102344,Cradlepoint & Velocloud,102344,,GOCO,QC,Boucherville,1221 rue Nobel On The Run Convenience Store ,J4B 8E4,10-Apr,12pm
+QC-100406,Cradlepoint Only,100406,,GOCO,QC,St-Bruno,1275 rue. Roberval ,J3V 5J1,10-Apr,12pm
+QC-103463,Cradlepoint Only,103463,,GOCO,QC,Beloeil,1180 Serge Pepin ,J3G 0K1,10-Apr,12pm
+QC-104140,Cradlepoint & Velocloud,104140,,GOCO,QC,St-Bruno,101 Montée Montarville ,J3V 6C5,10-Apr,9am
+QC-104885,Cradlepoint Only,104885,,GOCO,QC,St-Amable,510 Principale Rue ,J0L 1N0,13-Apr,12pm
+QC-104009,Cradlepoint Only,104009,,GOCO,QC,Marieville,155 Rue Ouellette ,J3M1A5,13-Apr,
+QC-104170,Cradlepoint Only,104170,,GOCO,QC,St-Remi,750 Rue St. Paul ,J0L 2L0,13-Apr,
+QC-103880,Cradlepoint & Velocloud,103880,,GOCO,QC,Kahnawake,"Petro T, 1860 Rte 132 ",J0L 1B0,13-Apr,12pm
+QC-103741,Cradlepoint Only,103741,,GOCO,QC,Chambly,2340 Chemin Des Patriotes ,J3L 6M7,13-Apr,12pm
+QC-104886,Cradlepoint Only,104886,,GOCO,QC,Saint Mathieu de Beloeil,4207 Rue Bernard-Pilon ,J3G 1V7,13-Apr,9am
+QC-101694,Cradlepoint Only,101694,,GOCO,QC,Vaudreuil Dorion,400 boul. Harwood ,J7V 7H4,14-Apr,
+QC-101919,Cradlepoint Only,101919,,GOCO,QC,Vaudreuil Dorion,485 av. St-Charles ,J7V 2N4,14-Apr,
+QC-105796,Cradlepoint Only,105796,,GOCO,QC,Vaudreuil Dorion,2440 Henry Ford Rd ,J7V 9H5,14-Apr,
+QC-102317,Cradlepoint Only,102317,,GOCO,QC,L`Ile-Perrot,104 boul. Don-Quichotte ,J7V 6L7,14-Apr,12pm
+QC-103409,Cradlepoint Only,103409,,GOCO,QC,L`Ile-Perrot,114 Grand Boulevard ,J0P 1K0,14-Apr,9am
+QC-103957,Cradlepoint Only,103957,,GOCO,QC,Saint Lazare De Vaudreuil,2681 Cote St. Charles ,J7T 2H8,14-Apr,9am
+QC-101916,Cradlepoint Only,101916,,GOCO,QC,Grande-ile,805 boul. Mgr-Langlois ,J6S 4V3,15-Apr,12pm
+QC-103484,Cradlepoint Only,103484,,GOCO,QC,Coteau-du-Lac,61 route 201 ,J0P 1B0,15-Apr,9am
+QC-105088,Cradlepoint Only,105088,,GOCO,QC,Les Coteaux,340 Montee Du Comte ,J7X 1A8,15-Apr,9am
+QC-105220,Cradlepoint Only,105220,,GOCO,QC,SALABERRY-DE-VALLEYFIELD,5299 Boul Hebert ,J6S 6H5,15-Apr,12pm
+QC-100155,Velocloud Only,100155,,GOCO,QC,Salaberry-de-Valleyfield,50 Alphonse-DesJardins ,J6S 2M4,15-Apr,12pm
+QC-102553,Cradlepoint Only,102553,,GOCO,QC,Salaberry-de-Valleyfield,2124 boul. Mgr Langlois ,J6S 5R1,15-Apr,9am
+QC-105412,Cradlepoint & Velocloud,105412,,GOCO,QC,Contrecoeur,4950 Des Patriotes Rue ,J0L 1C0,16-Apr,
+QC-106859,Cradlepoint & Velocloud,106859,,GOCO,QC,Ste. Martine,765A rte St-Jean-Baptisite ,J0S 1V0,16-Apr,
+QC-104185,Cradlepoint & Velocloud,104185,,GOCO,QC,Maple Grove,317 Route de maple grove ,J6N 1M2,16-Apr,12pm
+QC-105222,Cradlepoint Only,105222,,GOCO,QC,Ormstown,1410 Chemin De Jamestown ,J0S1K0,16-Apr,9am
+QC-101136,Cradlepoint Only,101136,,GOCO,QC,Varennes,320 boul. De La Marine ,J3X 2E6,16-Apr,12pm
+QC-104142,Cradlepoint Only,104142,,GOCO,QC,Salaberry-de-Valleyfield,395 Rue des Érables Suite 100,J6T6J5,16-Apr,12pm
+QC-106223,Cradlepoint Only,106223,,GOCO,QC,Granby,315 Denison Est ,J2H 2R6,17-Apr,12pm
+QC-103290,Cradlepoint Only,103290,,GOCO,QC,Granby,575 rue Saint-Hubert ,J2H 1Y5,17-Apr,9am
+QC-104272,Cradlepoint Only,104272,,GOCO,QC,Granby,1020 Rue Principale ,J2J2N7,17-Apr,12pm
+QC-105592,Cradlepoint Only,105592,,GOCO,QC,Waterloo,5 Rue Nord ,J0E 2N0,17-Apr,9am
+QC-103958,Cradlepoint Only,103958,,GOCO,QC,Sorel-Tracy,340 Boul. Poliquin ,J3P 0G4,17-Apr,12pm
+QC-105918,Cradlepoint Only,105918,,GOCO,QC,Varennes,1467 Boulevard Lionel-Boulet (Route 229 & Autoroute 30),J3X 1P7,17-Apr,9am
+QC-101779,Cradlepoint Only,101779,,GOCO,QC,Cowansville,1615 rue Du Sud ,J2K 2Z4,20-Apr,12pm
+QC-105771,Cradlepoint Only,105771,,GOCO,QC,Cowansville,761 Boulevard J. André Déragon ,J2K 5G6,20-Apr,9am
+QC-103057,Cradlepoint Only,103057,,GOCO,QC,St-Cesaire,2030 Route 112 ,J0L 1T0,20-Apr,
+QC-105096,Cradlepoint Only,105096,,GOCO,QC,Farnham,825 Lucien Chenier ,J2N 0A9,20-Apr,9am
+QC-102600,Cradlepoint & Velocloud,102600,,GOCO,QC,Boisbriand,355 Montee Sanche ,J7G 2E7,20-Apr,
+QC-102668,Cradlepoint & Velocloud,102668,,GOCO,QC,Ste-Therese,313 boul. Cure-Labelle ,J7E 2Y2,20-Apr,
+QC-102452,Cradlepoint Only,102452,,GOCO,QC,Notre Dame Des Prairies,508 Route 131 ,J6E 7Y8,21-Apr,
+QC-102551,Cradlepoint Only,102551,,GOCO,QC,Lachenaie,400 Montee des Pionniers ,J6V 1N9,21-Apr,
+QC-103592,Cradlepoint Only,103592,,GOCO,QC,Joliette,617 Boul de l'Industrie ,J0K 3E0,21-Apr,
+QC-100505,Cradlepoint Only,100505,,GOCO,QC,Saint-Jérôme,1500 BD du Cure Labelle ,J7Y 1S1,21-Apr,
+QC-100926,Cradlepoint Only,100926,,GOCO,QC,St-Eustache,255 25e Avenue ,J7P 4Y1,21-Apr,
+QC-101013,Cradlepoint Only,101013,,GOCO,QC,St-Jerome,314 rue Montigny ,J7Z 5R3,21-Apr,
+QC-100917,Cradlepoint Only,100917,,GOCO,QC,Berthierville,1041 av. Gilles Villeneuve ,J0K 1A0,22-Apr,
+QC-103062,Velocloud Only,103062,,GOCO,QC,Lavaltrie,79 chemin de Lavaltrie ,J5T 2H5,22-Apr,
+QC-103657,Cradlepoint Only,103657,,GOCO,QC,Joliette,101 Joseph Arthur boulevard ,J6E 4M4,22-Apr,
+QC-103903,Cradlepoint Only,103903,,GOCO,QC,St-Felix-de-Valois,3100 Henri-L-Chevrette ,J0K 2M0,22-Apr,
+QC-104652,Cradlepoint Only,104652,,GOCO,QC,Joliette,900 Rue Saint Pierre Sud ,J6E 0B5,22-Apr,
+QC-104837,Cradlepoint Only,104837,,GOCO,QC,Saint Charles Borromee,326 Rue de la Visitation ,J6E 4N7,22-Apr,
+QC-103495,Cradlepoint Only,103495,,GOCO,QC,Louiseville,1440 boulevard St-Laurent Est ,J5V 2L4,23-Apr,
+QC-103644,Cradlepoint Only,103644,,GOCO,QC,Maskinonge,161 Autoroute 40 Est Local 100,J0K 1N0,23-Apr,
+QC-104736,Cradlepoint Only,104736,,GOCO,QC,Rawdon,3164 1 Av ,J0K1S0,23-Apr,
+QC-106437,Cradlepoint Only,106437,,GOCO,QC,Saint Esprit,130 Rue St-Isidore ,J0K 2L0,23-Apr,
+QC-103281,Cradlepoint Only,103281,,GOCO,QC,Victoriaville,"12, rue de la Grande-Place ",G6S1E8,24-Apr,12pm
+QC-100285,Cradlepoint Only,100285,,GOCO,QC,Victoriaville,602 boul. des Bois-Francs Sud ,G6P 5X2,24-Apr,12pm
+QC-100410,Cradlepoint Only,100410,,GOCO,QC,Mont-Tremblant,180 rue de St-Jovite ,J8E 2Z9,24-Apr,
+QC-100757,Cradlepoint Only,100757,,GOCO,QC,Ste-Agathe-des-Monts,245 rue Principale Est ,J8C 1K8,24-Apr,
+QC-100883,Cradlepoint & Velocloud,100883,,GOCO,QC,Lachute,610 rue Principale ,J8H 1Y9,24-Apr,
+QC-105218,Cradlepoint Only,105218,,GOCO,QC,St Jean Sur Richelieu,2011 RTE 133 ,J2X 4M5,30-Apr,12pm
+QC-100759,Cradlepoint Only,100759,,GOCO,QC,Ste-Julie,190 boul. Armand-Frappier RR3 ,J3E 1Y2,4-May,9am
+QC-102378,Cradlepoint & Velocloud,102378,,GOCO,QC,St-Basile-le-Grand,195 Sir Wilfird Laurier ,J3N 1R1,4-May,
+QC-100128,Cradlepoint Only,100128,,GOCO,QC,Shawinigan,1600 Rue Trudel ,G9N 8k8,5-May,
+QC-100339,Cradlepoint & Velocloud,100339,,GOCO,QC,Grand-Mere,555 17e Rue ,G9T 6V5,5-May,
+QC-100563,Cradlepoint Only,100563,,GOCO,QC,Trois-Rivieres,607 Boulevard Thibeau ,G8T6Z6,6-May,
+QC-100742,Cradlepoint Only,100742,,GOCO,QC,Trois-Rivieres,4775 boul. Des Forges ,G8Y 4Z3,6-May,
+QC-101527,Cradlepoint Only,101527,,GOCO,QC,Trois-Rivieres,285 rue Barkoff ,G8T 2A5,7-May,
+QC-102205,Cradlepoint & Velocloud,102205,,GOCO,QC,Trois-Rivieres,2600 boul. Des Recollets ,G8Z 3X7,7-May,
+QC-100925,Cradlepoint Only,100925,,GOCO,QC,L`Ange-Gardien,122 Route 235 ,J0E 1E0,8-May,12pm
+QC-102994,Cradlepoint & Velocloud,102994,,GOCO,QC,Trois-Rivieres,4525 boul. Gene H Kruger ,G9A 4N3,8-May,
+QC-104352,Cradlepoint Only,104352,,GOCO,QC,Trois-Rivieres,850 Boul. Du St-Maurice ,G9A 3P7,8-May,
+QC-104425,Cradlepoint & Velocloud,104425,,GOCO,QC,Trois-Rivieres,1690 rue St-Maurice ,G8V 2M7,11-May,
+QC-105079,Cradlepoint Only,105079,,GOCO,QC,Trois-Rivieres,6710 Boulevard Des Chenaux ,G8Y 5A9,11-May,
+QC-101792,Cradlepoint Only,101792,,GOCO,QC,Hudson,99 Route 201 ,J0P 1P0,12-May,9am
+QC-105086,Cradlepoint Only,105086,,GOCO,QC,Trois Rivieres,3180 Boulevard Saint-Jean ,G9B 2M3,12-May,
+QC-104664,Cradlepoint & Velocloud,104664,,GOCO,QC,Saint-Hubert,3100 BD Moise Vincent ,J3Z 0C4,13-May,9am
+QC-105276,Cradlepoint Only,105276,,GOCO,QC,Saint-Donat,868 Rue Principale ,J0T 2C0,21-May,
+QC-101439,Cradlepoint & Velocloud,101439,,GOCO,QC,Lasalle,8080 boul. Champlain ,H8P 1B3,21-May,12pm
+QC-102439,Cradlepoint & Velocloud,102439,,GOCO,QC,LaSalle,8390 boul. Newman ,H8N 1X9,21-May,9am
+QC-102673,Cradlepoint Only,102673,,GOCO,QC,St-Eustache,490 boul. Arthur-Sauve ,J7R 7K8,21-May,
+QC-102986,Cradlepoint Only,102986,,GOCO,QC,St-Sauveur,201 Avenue de La Gare ,J0R 1R3,21-May,
+QC-102763,Velocloud Only,102763,,GOCO,QC,Montreal,9600 Maurice Duplessis ,H1E 1N2,22-May,12pm
+QC-103259,Cradlepoint & Velocloud,103259,,GOCO,QC,Montreal,"9725, boul. Henri-Bourassa Est ",H1C0B8,22-May,9am
+QC-103059,Cradlepoint Only,103059,,GOCO,QC,Val-David,1410 Route 117 ,J0T 2N0,22-May,
+QC-103191,Cradlepoint Only,103191,,GOCO,QC,Bois-des-Filion,903 rue Industrielle ,J6Z4W4,22-May,
+QC-102453,Cradlepoint & Velocloud,102453,,GOCO,QC,Montreal,6270 boul. Louis-H. Lafontaine ,H1M 1S8,25-May,12pm
+QC-103219,Cradlepoint & Velocloud,103219,,GOCO,QC,Lachute,484 Avenue Bethany ,J8H 4H5,25-May,
+QC-103242,Cradlepoint Only,103242,,GOCO,QC,Mirabel,"13935, rue St-Simon ",J7N1P4,25-May,
+QC-100203,Cradlepoint & Velocloud,100203,,GOCO,QC,Montreal,6765 rue Hochelaga ,H1N 1Y2,26-May,12pm
+QC-103128,Cradlepoint & Velocloud,103128,,GOCO,QC,Montreal,5900 ruse Sherbrooke Est ,H1N 1B5,26-May,9am
+QC-103293,Cradlepoint Only,103293,,GOCO,QC,St-Eustache,"400, rue Dubois local 103",J7P 4W9,26-May,
+QC-103391,Cradlepoint Only,103391,,GOCO,QC,Prevost,2657 Boul du Cure - Labelle ,J0R 1T0,26-May,
+QC-102039,Cradlepoint Only,102039,,GOCO,QC,Masson-Angers,1015 chemin de Masson ,J8M 1R4,11-May,
+QC-103953,Cradlepoint Only,103953,,GOCO,QC,Gatineau,1223 de Neuville ,J8M 1W2,12-May,
+QC-103994,Cradlepoint Only,103994,,GOCO,QC,Val-des-Monts,1797 RTE Du Carrefour ,J8N 7M7,13-May,
+QC-103390,Cradlepoint Only,103390,,GOCO,QC,Gatineau,415 Montee Paiement ,J8P 0B1,14-May,
+QC-101708,Cradlepoint Only,101708,,GOCO,QC,Gatineau,327 boul. Maloney Est ,J8P 1E2,15-May,
+QC-102393,Cradlepoint Only,102393,,GOCO,QC,Gatineau,933 boul. Maloney Est ,J8P 1H8,19-May,
+QC-104468,Cradlepoint Only,104468,,GOCO,QC,Gatineau,415 Boul la Vérendrye E. ,J8R 1N2,20-May,
+QC-102630,Cradlepoint Only,102630,,GOCO,QC,Gatineau,740 Montee Paiement ,J8R 4A3,21-May,
+QC-101256,Cradlepoint Only,101256,,GOCO,QC,Gatineau,378 boul. Greber ,J8T 5R6,22-May,
+QC-101861,Cradlepoint Only,101861,,GOCO,QC,Gatineau,2 avenue Du Pont ,J8V 1E5,25-May,
+QC-103184,Cradlepoint Only,103184,,GOCO,QC,Gatineau,200 Promenade du Portage ,J8X 4B7,26-May,
+QC-100467,Cradlepoint Only,100467,,GOCO,QC,Gatineau,650 St-Joseph Boulevard ,J8Y 4A8,27-May,
+QC-104037,Cradlepoint Only,104037,,GOCO,QC,Gatineau,210 BD De La Cite-Des-Jeunes ,J8Y6L1,28-May,
+QC-103069,Cradlepoint Only,103069,,GOCO,QC,Gatineau,894 boul. St-Joseph ,J8Z 1S9,29-May,
+QC-101707,Cradlepoint Only,101707,,GOCO,QC,Gatineau,208 boul. St-Raymond ,J9A 3H6,1-Jun,
+QC-103111,Cradlepoint Only,103111,,GOCO,QC,Maniwaki,22 rue Principale Nord ,J9E 2B3,2-Jun,
+QC-103602,Cradlepoint Only,103602,,GOCO,QC,Aylmer,25 Lucerne ,J9H 1L9,3-Jun,
+QC-100500,Cradlepoint Only,100500,,GOCO,QC,Gatineau,165 rue Principale ,J9H 3M9,4-Jun,
+QC-104953,Cradlepoint Only,104953,,GOCO,QC,Gatineau,10 Rue de la Fabrique ,J9J 2X3,5-Jun,
+QC-102926,Cradlepoint Only,102926,,GOCO,QC,Gatineau,405 chemin Vanier ,J9J 3H9,8-Jun,
+QC-104708,Cradlepoint Only,104708,,GOCO,QC,Mont-Laurier,2597 CH de la Lievre N ,J9L3G3,9-Jun,
+QC-101189,Cradlepoint & Velocloud,101189,,GOCO,QC,Montreal,2155 boul. De Maisonneuve Est ,H2K 4S3,27-May,12pm
+QC-103603,Cradlepoint Only,103603,,GOCO,QC,Bellefeuille,1073 Roland Godard ,J7Y 4C3,27-May,
+QC-104043,Cradlepoint Only,104043,,GOCO,QC,St-Eustache,550 Blvd Arthur-Sauvé ,J7R 5A8,27-May,
+QC-102031,Cradlepoint & Velocloud,102031,,GOCO,QC,Montreal,323 rue Jean-Talon Est ,H2R 1T2,28-May,12pm
+QC-102199,Cradlepoint & Velocloud,102199,,GOCO,QC,Montreal,115 boul. Cremazie Ouest ,H2N 1L4,28-May,9am
+QC-104474,Cradlepoint Only,104474,,GOCO,QC,Ste-Adele,407 Boulevard Sainte Adèle ,J8B 2N1,28-May,
+QC-104977,Velocloud Only,104977,,GOCO,QC,Grenville,35 Maple Street ,J0V 1J0,28-May,
+QC-102275,Cradlepoint & Velocloud,102275,,GOCO,QC,Montreal,3440 boul. St-Laurent ,H2X 2T9,29-May,12pm
+QC-103221,Cradlepoint & Velocloud,103221,,GOCO,QC,Montreal,5800 Christophe Colomb ave Colomb ave & Rosemont,H2S 2G2,29-May,9am
+QC-105080,Cradlepoint Only,105080,,GOCO,QC,Piedmont,770 Des Laurentides ,J0R 1K0,29-May,
+QC-106353,Cradlepoint Only,106353,,GOCO,QC,Mirabel,"8120 Ch Chicot N, ",J7N 2H5,29-May,
+QC-100892,Cradlepoint & Velocloud,100892,,GOCO,QC,Montreal,700  av. Atwater ,H4C 2G9,1-Jun,9am
+QC-102984,Cradlepoint Only,102984,,GOCO,QC,L`Ancienne-Lorette,1225 Autoroute Duplessis ,G2G 2B4,1-Jun,9am
+QC-101309,Velocloud Only,101309,,GOCO,QC,Dollard-Des-Ormeaux,3340 boul. Des Sources ,H9B 1Z9,1-Jun,12pm
+QC-100860,Cradlepoint Only,100860,,GOCO,QC,Ste-Foy,960 av. De Bourgogne ,G1W 2L5,1-Jun,9am
+QC-100489,Cradlepoint Only,100489,,GOCO,QC,Quebec City,5050 boul. Wilfred-Hamel ,G2E 5X5,2-Jun,12pm
+QC-102814,Cradlepoint Only,102814,,GOCO,QC,L`Ancienne-Lorette,6095 boul. Wilfrid-Hamel ,G2E 2H3,2-Jun,12pm
+QC-100637,Velocloud Only,100637,,GOCO,QC,Dollard-des-Ormeaux,4932 boul. Des Sources ,H8Y 3C9,2-Jun,9am
+QC-102904,Velocloud Only,102904,,GOCO,QC,St-Laurent,400 Marcel-Laurin ,H4M 2L4,2-Jun,12pm
+QC-101316,Cradlepoint Only,101316,,GOCO,QC,Quebec City,3400 1iere Avenue ,G1L 3R5,3-Jun,9am
+QC-102715,Cradlepoint & Velocloud,102715,,GOCO,QC,St-Laurent,3838 Cete-Vertu ,H4R 1P8,3-Jun,9am
+QC-103104,Cradlepoint Only,103104,,GOCO,QC,Blainville,1135 boul. Cure-Labelle ,J7C 2N2,3-Jun,12pm
+QC-103237,Cradlepoint Only,103237,,GOCO,QC,Charlesbourg,4680 Henri-Bourassa ,G1H 3A5,3-Jun,9am
+QC-101526,Cradlepoint Only,101526,,GOCO,QC,Blainville,50 boul. De La Seigneurie Ouest ,J7C 5M3,4-Jun,9am
+QC-103605,Cradlepoint Only,103605,,GOCO,QC,Boisbriand,"160, 6e Avenue ",J7G 1Y6,4-Jun,12pm
+QC-102298,Cradlepoint & Velocloud,102298,,GOCO,QC,Beauport,3319 rue Du Carrefour ,G1C 7E1,4-Jun,9am
+QC-103437,Cradlepoint Only,103437,,GOCO,QC,Beauport,2960 Boul Louis XIV ,G1C 0J4,4-Jun,12pm
+QC-103593,Cradlepoint Only,103593,,GOCO,QC,Quebec City,2600 Boul Laurier ,G1V 4T3,5-Jun,12pm
+QC-104330,Cradlepoint Only,104330,,GOCO,QC,Quebec City,3235 Ch. Quatres-bourgeois ,G1X 2Z7,5-Jun,9am
+QC-102456,Cradlepoint & Velocloud,102456,,GOCO,QC,Rosemere,198 boul. Labelle ,J7A 2H1,5-Jun,12pm
+QC-102667,Cradlepoint Only,102667,,GOCO,QC,Boisbriand,2320 boul du Faubourg ,J7H 1S3,5-Jun,9am
+QC-104430,Cradlepoint Only,104430,,GOCO,QC,Quebec City,2790 Boul. De La Faune ,G3H 1H1,8-Jun,12pm
+QC-105345,Cradlepoint Only,105345,,GOCO,QC,Quebec City,2010 Ave Industrielle ,G3K 1L7,8-Jun,9am
+QC-101737,Cradlepoint Only,101737,,GOCO,QC,Ste-Therese,210 rue St-Charles ,J7E 2B4,8-Jun,9am
+QC-102566,Cradlepoint Only,102566,,GOCO,QC,Ste-Therese,166 Turgeon ,J7E 3J3,8-Jun,12pm
+QC-102865,Cradlepoint Only,102865,,GOCO,QC,Quebec City,310 etienne-Dubreuil ,G1M 3H1,9-Jun,9am
+QC-105270,Cradlepoint Only,105270,,GOCO,QC,Quebec City,355 3e Rue ,G1L2V9,9-Jun,12pm
+QC-101965,Cradlepoint Only,101965,,GOCO,QC,Mascouche,56 ch. Des Anglais ,J7L 3N6,9-Jun,12pm
+QC-103610,Cradlepoint Only,103610,,GOCO,QC,Mascouche,590 Montee Masson ,J7K 2L5,9-Jun,9am
+QC-101139,Cradlepoint Only,101139,,GOCO,QC,Quebec City,1874 av. Destimauville ,G1J 5B1,10-Jun,12pm
+QC-103772,Cradlepoint Only,103772,,GOCO,QC,Terrebonne,7200 boul Laurier ,J7M 1T8,10-Jun,12pm
+QC-103926,Cradlepoint & Velocloud,103926,,GOCO,QC,Terrebonne,1100 rang st-francois ,J6Y 1Z5,10-Jun,9am
+QC-104473,Cradlepoint & Velocloud,104473,,GOCO,QC,Stoneham,"2 Rte Tewkesbury, Bur 107 ",G3C 2K6,10-Jun,12pm
+QC-104426,Cradlepoint Only,104426,,GOCO,QC,Sainte Sophie,2350 BD Sainte Sophie ,J8L 6L1,10-Jun,
+QC-101240,Cradlepoint Only,101240,,GOCO,QC,Quebec City,11001 boul. Henri-Bourassa ,G1G 3X4,11-Jun,12pm
+QC-102953,Cradlepoint Only,102953,,GOCO,QC,Quebec City,9485 boul Henri-Bourrassa ,G1G 4E7,11-Jun,9am
+QC-102274,Cradlepoint Only,102274,,GOCO,QC,Mirabel,17535 ch. Charles RR123 ,J7J 1P3,11-Jun,12pm
+QC-103086,Cradlepoint & Velocloud,103086,,GOCO,QC,Mirabel,14055 boul. Du Cure-Labelle ,J7J 1M3,11-Jun,9am
+QC-104965,Cradlepoint Only,104965,,GOCO,QC,Papineauville,387 Rue Papineau ,J0V 1R0,11-Jun,
+QC-105590,Cradlepoint Only,105590,,GOCO,QC,Buckingham,160 Lepine ,J8l 4M4,11-Jun,
+QC-102907,Cradlepoint Only,102907,,GOCO,QC,Quebec City,4750 Route Ste-Genevieve ,G2B 4P1,12-Jun,9am
+QC-103672,Cradlepoint Only,103672,,GOCO,QC,Quebec City,2293 avenue Chauveau ,G2C 0G7,12-Jun,12pm
+QC-101830,Cradlepoint & Velocloud,101830,,GOCO,QC,Laval,3665 Autoroute 440 Est. ,H7E 5K3,12-Jun,9am
+QC-102719,Cradlepoint & Velocloud,102719,,GOCO,QC,Laval,2600 boul. Daniel Johnson ,H7T 2K1,12-Jun,12pm
+QC-100656,Cradlepoint & Velocloud,100656,,GOCO,QC,Laval,4636 boul. Samson ,H7W 2H3,15-Jun,9am
+QC-102724,Cradlepoint Only,102724,,GOCO,QC,Ste-Anne-de-Beaupre,9657 boul. Ste-Anne ,G0A 3C0,15-Jun,9am
+QC-103933,Cradlepoint Only,103933,,GOCO,QC,Boischatel,5550 boul.Ste-Anne ,G0A1H0,15-Jun,12pm
+QC-102392,Cradlepoint & Velocloud,102392,,GOCO,QC,Riviere-a-Pierre,7545 boul. Maurice-Duplessis ,H1E 7N2,15-Jun,12pm
+QC-101247,Cradlepoint Only,101247,,GOCO,QC,Donnacona,212 Route 138 RR2 ,G3M 1C2,16-Jun,12pm
+QC-105398,Cradlepoint Only,105398,,GOCO,QC,Deschambault,152 Dessault ,G0A 1S0,16-Jun,9am
+QC-104773,Cradlepoint Only,104773,,GOCO,QC,Pont-rouge,220 rue du college ,G3H 0C6,17-Jun,9am
+QC-105894,Cradlepoint Only,105894,,GOCO,QC,saint-raymond,247 COTE JOYEUSE ,G3L4AB,17-Jun,12pm
+QC-103273,Cradlepoint Only,103273,,GOCO,QC,Ste-Foy,1700 rue Jules Verne ,G2G2R1,18-Jun,12pm
+QC-103506,Cradlepoint Only,103506,,GOCO,QC,Sillery,1280 Grande- Alle Ouest ,G1S 1E8,18-Jun,
+QC-102625,Cradlepoint Only,102625,,GOCO,QC,Quebec City,750 rue Bouvier ,G2J 1A3,19-Jun,9am
+QC-104476,Cradlepoint & Velocloud,104476,,GOCO,QC,Beauport,970 Av Nordique ,G1C 0H1,19-Jun,9am
+QC-104307,Cradlepoint Only,104307,,GOCO,QC,La Malbaie,2035 bld Comporte ,G5A 1N8,22-Jun,12pm
+QC-101338,Cradlepoint & Velocloud,101338,,GOCO,QC,Baie-St-Paul,995 boul. Mgr de Laval ,G3Z 2W2,22-Jun,12pm
+QC-105085,Cradlepoint Only,105085,,GOCO,QC,Chicoutimi,1997 Boulevard Talbot ,G7H 8C4,23-Jun,9am
+QC-103251,Cradlepoint Only,103251,,GOCO,QC,La Baie,"1000, rue Bagot ",G7B2N9,23-Jun,
+QC-100454,Cradlepoint Only,100454,,GOCO,QC,Chicoutimi,1494 boul. Talbot ,G7H 4C2,22-Jun,9am
+QC-102803,Cradlepoint Only,102803,,GOCO,QC,Chicoutimi,1401 boul. Talbot (Place du Royaume) ,G7H 6E1,22-Jun,12pm
+QC-102788,Cradlepoint Only,102788,,GOCO,QC,Chicoutimi,1050 Ste-Genevieve ,G7G 2G6,25-Jun,9am
+QC-106273,Cradlepoint Only,106273,,GOCO,QC,Chicoutimi,2075 Tadoussac ,G7G 2V1,25-Jun,12pm
+QC-102332,Cradlepoint Only,102332,,GOCO,QC,Jonquiere,2390 boul. Rene-Levesque ,G7S 5Y5,26-Jun,
+QC-102777,Cradlepoint Only,102777,,GOCO,QC,Jonquiere,2667 boul du Royaume ,G7S 5B8,26-Jun,
+QC-103904,Cradlepoint Only,103904,,GOCO,QC,Jonquiere,3587 Boul Harvey ,G7X 3B5,29-Jun,
+QC-104041,Cradlepoint Only,104041,,GOCO,QC,Jonquiere,3895 Des Mouettes ,G7X 0M4,29-Jun,
+QC-100501,Cradlepoint Only,100501,,GOCO,QC,Alma,1049 avenue Du Pont sud ,G8B 0E8,30-Jun,
+QC-104994,Cradlepoint Only,104994,,GOCO,QC,Jonquiere,3820 BD Harvey ,G7X8T5,30-Jun,
+QC-105219,Cradlepoint Only,105219,,GOCO,QC,Alma,1775 Avenue Du Pont S ,G8B 6N3,2-Jul,
+QC-106106,Cradlepoint Only,106106,,GOCO,QC,Metabetchouan,7 Rue des Erables ,G8G 1B3,2-Jul,
+QC-102988,Cradlepoint Only,102988,,GOCO,QC,St-Felicien,1180 boul. St-Felicien ,G8K 0A6,3-Jul,
+QC-103094,Cradlepoint Only,103094,,GOCO,QC,Roberval,690 boul. Marcotte ,G8H 1Z6,3-Jul,
+QC-102928,Cradlepoint Only,102928,,GOCO,QC,Dolbeau-Mistassini,245 8e Avenue ,G8L 1Z5,6-Jul,
+QC-107322,Cradlepoint Only,107322,,GOCO,QC,Forestville,"181, road 138 ",G0T 1E0,7-Jul,12pm
+QC-100343,Cradlepoint Only,100343,,GOCO,QC,Sept-Iles,399 av. Gamache ,G4R 2H6,8-Jul,9am
+QC-100127,Cradlepoint Only,100127,,GOCO,QC,Sept-Iles,810 Boul Laure ,G4R 1Y8,8-Jul,9am
+QC-100942,Cradlepoint Only,100942,,GOCO,QC,Sept-Iles,598 boul. Laure ,G4R 1X7,9-Jul,12pm
+QC-105404,Cradlepoint & Velocloud,105404,,GOCO,QC,Havre-Saint-Pierre,938-958 BLVD Du Cometique ,G0G 1P0,10-Jul,12pm
+QC-100154,Cradlepoint & Velocloud,100154,,GOCO,QC,Baie-Comeau,665 boul. Lafleche ,G5C 1C4,13-Jul,12pm
+QC-100354,Cradlepoint Only,100354,,GOCO,QC,Baie-Comeau,316 boul. La Salle ,G4Z 2W4,13-Jul,9am
+QC-100435,Cradlepoint & Velocloud,100435,,GOCO,QC,Matane,695 ave. Du Phare ,G4W 1V4,14-Jul,12pm
+QC-101241,Cradlepoint Only,101241,,GOCO,QC,Ste-Anne-Des-Monts,2 boul. Ste-Anne Ouest CP 355 ,G4V 1P3,14-Jul,
+QC-101159,Cradlepoint Only,101159,,GOCO,QC,Gaspe,100 rue De La Reine ,G4X 1T2,15-Jul,
+QC-101814,Cradlepoint Only,101814,,GOCO,QC,Paspebiac,119 boul. Gerard-D-Levesque Ouest route 132 ,G0C 2K0,16-Jul,12pm
+QC-104856,Cradlepoint Only,104856,,GOCO,QC,Chandler,499 rue Rehel ,G0C 1K0,16-Jul,9am
+QC-105772,Cradlepoint Only,105772,,GOCO,QC,Amqui,394 Boulevard Saint-Benoit Ouest ,G5J 2G6,20-Jul,12pm
+QC-101232,Cradlepoint Only,101232,,GOCO,QC,Mont-Joli,1730 boul. Gaboury ,G5H 3J2,21-Jul,9am
+QC-103849,Cradlepoint Only,103849,,GOCO,QC,Mont-Joli,"1019, boul Jacques Cartier ",G5H 2S5,21-Jul,12pm
+QC-100196,Cradlepoint Only,100196,,GOCO,QC,Rimouski,141 Leonidas St ,G5L 7Y3,22-Jul,9am
+QC-104286,Cradlepoint Only,104286,,GOCO,QC,Trois-Pistoles,715 Rue L'Italien ,G0L 4K0,23-Jul,12pm
+QC-102692,Cradlepoint Only,102692,,GOCO,QC,Riviere-du-Loup,235 rue de LHotel de Ville ,G5R 4E5,24-Jul,12pm
+QC-105402,Cradlepoint Only,105402,,GOCO,QC,Riviere-du-Loup,67 Boulevard Cartier ,G5R 2Z3,24-Jul,9am
+QC-103192,Cradlepoint & Velocloud,103192,,GOCO,QC,Saint Antonin,"82, rue principale ",G0L2K0,27-Jul,12pm
+QC-103993,Cradlepoint Only,103993,,GOCO,QC,Témiscouata-sur-le-Lac,274-a Boul Phil-Latulippe ,G0L 1E0,27-Jul,9am
+QC-103959,Cradlepoint Only,103959,,GOCO,QC,St-Jean-Port-Joli,707 route de l'Église ,G0R 3G0,28-Jul,12pm
+QC-103066,Cradlepoint & Velocloud,103066,,GOCO,QC,La Pocatiere,221 avenue Industrielle Route 132 ,G0R 1Z0,28-Jul,12pm
+QC-103606,Cradlepoint Only,103606,,GOCO,QC,Sorel,6500 de la Plaza avenue ,J3R 4L7,28-Jul,9am
+QC-104308,Cradlepoint Only,104308,,GOCO,QC,Sorel-Tracy,1025 Route Marie-Victorin ,J3R 1L5,28-Jul,12pm
+QC-100907,Cradlepoint Only,100907,,GOCO,QC,Montmagny,55 boul. Tache Est ,G5V 1B6,29-Jul,9am
+QC-104441,Cradlepoint Only,104441,,GOCO,QC,Levis,7335 Boul de La Rive-Sud ,G6V 7A3,29-Jul,9am
+QC-103739,Cradlepoint Only,103739,,GOCO,QC,Repentigny,276 Louis-Philippe Picard ,J5Y 4G1,29-Jul,12pm
+QC-103990,Cradlepoint Only,103990,,GOCO,QC,Saint Sulpice,723 Notre-Dame ,J5W 3W6,29-Jul,9am
+QC-103716,Cradlepoint Only,103716,,GOCO,QC,Levis,5335 Boul Guillaume-Couture ,G6V 4Z3,30-Jul,12pm
+QC-105770,Cradlepoint Only,105770,,GOCO,QC,Pintendre,725 Route Du President-Kennedy ,G6C 1E2,30-Jul,9am
+QC-101455,Cradlepoint Only,101455,,GOCO,QC,Ste-Helene-De-Bagot,561 rue Principale RR1 ,J0H 1M0,30-Jul,12pm
+QC-103154,Cradlepoint Only,103154,,GOCO,QC,St-Liboire,1145 Rang St-edouard ,J0H 1R0,30-Jul,9am
+QC-103291,Cradlepoint Only,103291,,GOCO,QC,St-Jean-Chrysostome,"800, rue Commerciale ",G6Z 2C9,31-Jul,12pm
+QC-104836,Cradlepoint Only,104836,,GOCO,QC,St-Jean-Chrysostome,1005 rue Beaulieu ,G6Z 2L1,31-Jul,9am
+QC-100785,Cradlepoint Only,100785,,GOCO,QC,Saint-Hyacinthe,2505 boul. Casavant Ouest ,J2S 8B8,31-Jul,9am
+QC-103502,Cradlepoint Only,103502,,GOCO,QC,Saint-Hyacinthe,1450 Boul Casavant Est ,J2S 0G2,31-Jul,12pm
+QC-102454,Cradlepoint Only,102454,,GOCO,QC,St-Romuald,1070 Boulevard Guillaume-Couture ,G6W 5M6,3-Aug,12pm
+QC-101173,Cradlepoint Only,101173,,GOCO,QC,St-Nicolas,100 - 465 route du Pont ,G7A 2P9,3-Aug,12pm
+QC-101974,Velocloud Only,101974,,GOCO,QC,St-Jean-Chrysostome,"645 Avenue Taniata, Lévis ",G6Z 2C1,4-Aug,9am
+QC-103596,Cradlepoint Only,103596,,GOCO,QC,St-Nicolas,501 Rue de l'Arena ,G7A 1C9,4-Aug,9am
+QC-103134,Cradlepoint Only,103134,,GOCO,QC,St-Germain-de-Grantham,351-A chemin Yamaska R.R. 2 ,J0C 1K0,4-Aug,9am
+QC-104172,Cradlepoint Only,104172,,GOCO,QC,Ste-Julienne,2570 rue Alain ,J0K 2T0,4-Aug,12pm
+QC-102532,Cradlepoint Only,102532,,GOCO,QC,Laurier-Station,128 boul. Laurier ,G0S 1N0,5-Aug,9am
+QC-102845,Cradlepoint Only,102845,,GOCO,QC,St-Apollinaire,495 rue Laurier ,G0S 2E0,5-Aug,12pm
+QC-104605,Cradlepoint Only,104605,,GOCO,QC,Sainte Marie,1370 BD Vachon Nord ,G6E 1N4,6-Aug,12pm
+QC-102859,Cradlepoint Only,102859,,GOCO,QC,Ste-Marie-de-Beauce,655 boul. Vachon ,G6E 1M3,6-Aug,9am
+QC-104436,Cradlepoint & Velocloud,104436,,GOCO,QC,La Peche,151 Chemin Valley ,J9B 2K1,10-Jun,
+QC-100994,Cradlepoint Only,100994,,GOCO,QC,St-Georges-de-Beauce,9024 boul. Lacroix ,G5Y 5P4,7-Aug,12pm
+QC-102989,Cradlepoint & Velocloud,102989,,GOCO,QC,St-Georges-de-Beauce,410 150ieme Rue ,G5Y 0E5,7-Aug,9am
+QC-103278,Cradlepoint Only,103278,,GOCO,QC,St-Georges-de-Beauce,"1990, 6ième Avenue ",G5X 3W8,10-Aug,12pm
+QC-103223,Velocloud Only,103223,,GOCO,QC,Lac Megantic,3793 Rue Laval ,G6B 1A6,10-Aug,9am
+QC-102818,Cradlepoint Only,102818,,GOCO,QC,Thetford Mines,1021 St-Alphonse Nord ,G6G 3X6,11-Aug,9am
+QC-103601,Cradlepoint Only,103601,,GOCO,QC,Thetford Mines,4131 Boul Frontenac Ouest ,G6H 2A5,11-Aug,12pm
+QC-102962,Cradlepoint & Velocloud,102962,,GOCO,QC,Saint Lin Laurentides,1025 rue St-Isidore ,J5M 2V5,6-Apr,12pm
