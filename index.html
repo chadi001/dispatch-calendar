@@ -661,6 +661,7 @@ Tech priority: <b>Adil</b> → <b>Abdel</b>. Capacity: 1 AM + 1 PM per tech/day.
         <button class="primary" id="btnPlanOptimize" type="button">Optimize routes</button>
         <button class="reset" id="btnPlanCompare" type="button">Compare scenario</button>
         <button class="reset" id="btnPlanApply" type="button">Apply scenario</button>
+        <button class="reset" id="btnSyncToDb" type="button" style="background:#059669;color:#fff;border-color:#059669;">Sync to Database</button>
         <button class="reset" id="btnPlanReset" type="button">Reset to imported data</button>
         <button class="reset" id="btnPlanExport" type="button">Export scenario CSV</button>
       </div>
@@ -670,7 +671,7 @@ Tech priority: <b>Adil</b> → <b>Abdel</b>. Capacity: 1 AM + 1 PM per tech/day.
       <details class="plannerAdvanced">
         <summary>Advanced tools</summary>
         <div class="plannerActionsRow" style="margin-top:8px">
-          <button class="reset" id="btnManageTechs" type="button">Manage techs</button>
+          <button class="reset" id="btnManageTechs" type="button">Manage team</button>
           <button class="reset" id="btnExportJobsCsv" type="button">Export jobs CSV</button>
           <button class="reset" id="btnExportOverridesJson" type="button">Export overrides JSON</button>
           <button class="reset" id="btnImportOverridesJson" type="button">Import overrides JSON</button>
@@ -798,43 +799,23 @@ Tech priority: <b>Adil</b> → <b>Abdel</b>. Capacity: 1 AM + 1 PM per tech/day.
   </div>
 </div>
 
-<!-- Manage Techs Modal -->
+<!-- Manage Team Modal -->
 <div id="manageTechsModal" class="modal" style="display:none" aria-hidden="true">
   <div class="modal-backdrop" id="manageTechsBackdrop"></div>
-  <div class="modal-dialog" role="dialog" aria-modal="true" aria-label="Manage techs">
+  <div class="modal-dialog" role="dialog" aria-modal="true" aria-label="Manage team mappings">
     <div class="modal-header">
       <div>
-        <div class="modal-title">Manage Techs</div>
-        <div class="modal-subtitle">Map authenticated users to tech names for job visibility.</div>
+        <div class="modal-title">Manage Team</div>
+        <div class="modal-subtitle">Map authenticated users to tech names.</div>
       </div>
       <button type="button" class="reset" id="btnCloseManageTechs">Close</button>
     </div>
     <div class="modal-body">
-      <div id="techManageList" style="display:flex;flex-direction:column;gap:10px;"></div>
-      <div style="margin-top:16px;padding-top:16px;border-top:1px solid #eee;">
-        <div style="font-weight:700;margin-bottom:8px;">Add new tech mapping</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
-          <div class="edgrp">
-            <div class="edlbl">Email</div>
-            <input type="email" id="newTechEmail" class="edsel" placeholder="tech@example.com" style="min-width:220px;"/>
-          </div>
-          <div class="edgrp">
-            <div class="edlbl">Tech Name</div>
-            <select id="newTechName" class="edsel">
-              <option value="">Select...</option>
-              <option value="Adil">Adil</option>
-              <option value="Abdel">Abdel</option>
-              <option value="Chadi">Chadi</option>
-              <option value="Tech A">Tech A</option>
-              <option value="Tech B">Tech B</option>
-            </select>
-          </div>
-          <button type="button" class="edbtn" id="btnAddTechMapping">Add</button>
-        </div>
-      </div>
+      <div class="small" style="margin-bottom:10px;color:#6b7280">Users come from Supabase Auth automatically.</div>
+      <div id="manageTechsList"></div>
     </div>
     <div class="modal-footer">
-      <button type="button" class="reset" id="btnRefreshTechList">Refresh</button>
+      <button type="button" class="reset" id="btnRefreshManageTechs">Refresh</button>
       <button type="button" class="reset" id="btnCloseManageTechs2">Close</button>
     </div>
   </div>
@@ -2347,69 +2328,118 @@ function closePlanScenarioModal(){
   modal.setAttribute('aria-hidden','true');
 }
 
-async function dbApplyScenarioToJobs(changes){
-  if(!window.sb || !window.IS_ADMIN) return { success: false, error: 'No admin access' };
-  
-  let updated = 0;
-  let errors = 0;
-  
-  for(const c of changes){
-    const dbId = c.key?.startsWith('DB:') ? c.key.replace('DB:','') : null;
-    if(!dbId) continue;
-    
-    const updates = {};
-    if(c.newTech && c.newTech !== c.oldTech) updates.tech_name = c.newTech;
-    if(c.newIso && c.newIso !== c.oldIso) updates.job_date = c.newIso;
-    if(c.newSlot && c.newSlot !== c.oldSlot){
-      updates.slot = c.newSlot;
-      updates.plage = c.newSlot;
+const dbBeforeSyncBackupKey = 'dispatch_db_before_sync_v1';
+
+function collectRenderedJobUpdates(){
+  rebuildMonthsFromOverrides();
+  const updates = [];
+  const seen = new Set();
+  for(const mid of Object.keys(payload.months || {})){
+    const m = payload.months[mid];
+    if(!m?.date_index) continue;
+    for(const iso of Object.keys(m.date_index)){
+      for(const it of (m.date_index[iso] || [])){
+        const dbId = String(it._db_id || it.id || '').trim();
+        if(!dbId || seen.has(dbId)) continue;
+        seen.add(dbId);
+        updates.push({
+          id: dbId,
+          tech_name: (it.tech || 'UNASSIGNED').trim() || 'UNASSIGNED',
+          slot: (it.plage || 'AM').trim() || 'AM',
+          plage: (it.plage || 'AM').trim() || 'AM',
+          job_date: iso
+        });
+      }
     }
-    
-    if(Object.keys(updates).length === 0) continue;
-    
+  }
+  return updates;
+}
+
+async function saveDbBackupForUpdates(updates){
+  if(!window.sb || !updates?.length) return { ok:false, rows:0 };
+  const ids = updates.map(u=>u.id);
+  const rows = [];
+  const chunkSize = 200;
+  for(let i=0;i<ids.length;i+=chunkSize){
+    const chunk = ids.slice(i, i+chunkSize);
+    const { data, error } = await window.sb
+      .from('jobs')
+      .select('id,tech_name,slot,plage,job_date')
+      .in('id', chunk);
+    if(error){
+      console.warn('[saveDbBackupForUpdates] chunk error:', error);
+      return { ok:false, rows:rows.length, error:error.message };
+    }
+    if(Array.isArray(data)) rows.push(...data);
+  }
+  try{
+    localStorage.setItem(dbBeforeSyncBackupKey, JSON.stringify({ saved_at:new Date().toISOString(), rows }));
+  }catch(e){
+    console.warn('[saveDbBackupForUpdates] localStorage error:', e);
+    return { ok:false, rows:rows.length, error:'localStorage' };
+  }
+  return { ok:true, rows:rows.length };
+}
+
+function loadDbBackup(){
+  try{
+    const raw = localStorage.getItem(dbBeforeSyncBackupKey);
+    if(!raw) return null;
+    const obj = JSON.parse(raw);
+    if(!obj || !Array.isArray(obj.rows)) return null;
+    return obj;
+  }catch(e){
+    return null;
+  }
+}
+
+async function restoreDbBackup(){
+  const b = loadDbBackup();
+  if(!b?.rows?.length) return { ok:false, updated:0, failed:0, message:'No backup found' };
+  let updated = 0;
+  let failed = 0;
+  for(const r of b.rows){
     try{
       const { error } = await window.sb
         .from('jobs')
-        .update(updates)
-        .eq('id', dbId);
-      
-      if(error){ console.warn('[dbApplyScenarioToJobs] error for', dbId, error); errors++; }
+        .update({
+          tech_name: r.tech_name || 'UNASSIGNED',
+          slot: r.slot || 'AM',
+          plage: r.plage || r.slot || 'AM',
+          job_date: r.job_date
+        })
+        .eq('id', r.id);
+      if(error){ failed++; }
       else { updated++; }
     }catch(e){
-      console.warn('[dbApplyScenarioToJobs] exception for', dbId, e);
-      errors++;
+      failed++;
     }
   }
-  
-  return { success: true, updated, errors };
+  return { ok:failed===0, updated, failed, saved_at:b.saved_at };
 }
 
 async function applyPlanScenario(){
   if(!requireAdminAction()) return;
   if(!__planScenario){ alert('Generate or optimize a scenario first.'); return; }
-  
+
   for(const c of __planScenario.changes){
     if(c.newIso!==c.oldIso) setDateOverride(c.key, c.newIso); else clearDateOverride(c.key);
     if(c.newTech!==c.oldTech) setTechOverride(c.key, c.newTech); else clearTechOverride(c.key);
     if(c.newSlot!==c.oldSlot) setPlageOverride(c.key, c.newSlot); else clearPlageOverride(c.key);
   }
-  
-  const dbResult = await dbApplyScenarioToJobs(__planScenario.changes);
-  console.log('[applyPlanScenario] DB update result:', dbResult);
-  
+
   rerenderActive();
   renderScenarioSummaryStrip();
-  
-  const msg = dbResult?.updated > 0 
-    ? `Scenario applied: ${__planScenario.changes.length} changes. DB updated: ${dbResult.updated} jobs.`
-    : `Scenario applied: ${__planScenario.changes.length} job changes (local only).`;
+
+  const dbResult = await syncToDatabase({ requireConfirm:false, quiet:true, backupMode:'save' });
+  const msg = `Scenario applied: ${__planScenario.changes.length} changes. DB synced: ${dbResult.updated}/${dbResult.total}` + (dbResult.failed ? ` (failed: ${dbResult.failed})` : '');
   alert(msg);
 }
 
 async function resetToImportedData(){
   if(!requireAdminAction()) return;
-  if(!confirm('Reset all overrides and return to imported DB data? This will also reset tech assignments in the database.')) return;
-  
+  if(!confirm('Reset planner state? If a backup exists, jobs will be restored to pre-apply values. Otherwise fallback is imported UNASSIGNED state.')) return;
+
   techOverrides = {};
   plageOverrides = {};
   dateOverrides = {};
@@ -2417,198 +2447,32 @@ async function resetToImportedData(){
   manualLocks = {};
   saveOverrides();
   __planScenario = null;
-  
+
+  let restoreMsg = '';
   if(window.sb && window.IS_ADMIN){
-    try{
-      const { error } = await window.sb
-        .from('jobs')
-        .update({ tech_name: 'UNASSIGNED', slot: 'AM', plage: 'AM' })
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-      if(error) console.warn('[resetToImportedData] DB reset error:', error);
-      else console.log('[resetToImportedData] DB jobs reset to UNASSIGNED');
-    }catch(e){
-      console.warn('[resetToImportedData] DB reset exception:', e);
+    const backup = loadDbBackup();
+    if(backup?.rows?.length){
+      const restored = await restoreDbBackup();
+      restoreMsg = `Restored backup: ${restored.updated} rows` + (restored.failed ? `, failed ${restored.failed}` : '');
+    }else{
+      try{
+        const { error } = await window.sb
+          .from('jobs')
+          .update({ tech_name: 'UNASSIGNED', slot: 'AM', plage: 'AM' })
+          .neq('id', '00000000-0000-0000-0000-000000000000');
+        if(error) console.warn('[resetToImportedData] DB fallback reset error:', error);
+        else restoreMsg = 'No backup found. Fallback reset to imported UNASSIGNED state.';
+      }catch(e){
+        console.warn('[resetToImportedData] DB fallback reset exception:', e);
+      }
     }
   }
-  
+
   await dbBootstrapJobsIntoPayload();
   rerenderActive();
   renderScenarioSummaryStrip();
-  alert('Reset complete. Back to imported data.');
+  alert(restoreMsg || 'Reset complete.');
 }
-
-// ---------------- Tech Management (Admin UI) ----------------
-let __techMappings = [];
-
-async function dbLoadTechMappings(){
-  if(!window.sb) return [];
-  try{
-    const { data, error } = await window.sb
-      .from('tech_name_map')
-      .select('user_id, tech_name, is_active');
-    if(error){ console.warn('[dbLoadTechMappings] error:', error); return []; }
-    const mappings = data || [];
-    const { data: users } = await window.sb.auth.admin.listUsers();
-    const emailMap = {};
-    (users?.users || []).forEach(u => { emailMap[u.id] = u.email; });
-    return mappings.map(m => ({ ...m, email: emailMap[m.user_id] || 'Unknown' }));
-  }catch(e){
-    console.warn('[dbLoadTechMappings] exception:', e);
-    return [];
-  }
-}
-
-async function dbSaveTechMapping(userId, techName, isActive = true){
-  if(!window.sb) return false;
-  try{
-    const { error } = await window.sb
-      .from('tech_name_map')
-      .upsert({ user_id: userId, tech_name: techName, is_active: isActive });
-    if(error){ console.warn('[dbSaveTechMapping] error:', error); return false; }
-    const { error: err2 } = await window.sb
-      .from('tech_profiles')
-      .upsert({ user_id: userId, display_name: techName, tech_code: techName.toLowerCase(), is_active: isActive });
-    if(err2) console.warn('[dbSaveTechMapping] tech_profiles warning:', err2);
-    return true;
-  }catch(e){
-    console.warn('[dbSaveTechMapping] exception:', e);
-    return false;
-  }
-}
-
-async function dbDeleteTechMapping(userId){
-  if(!window.sb) return false;
-  try{
-    await window.sb.from('tech_name_map').delete().eq('user_id', userId);
-    await window.sb.from('tech_profiles').delete().eq('user_id', userId);
-    return true;
-  }catch(e){
-    console.warn('[dbDeleteTechMapping] exception:', e);
-    return false;
-  }
-}
-
-function renderTechManageList(){
-  const container = document.getElementById('techManageList');
-  if(!container) return;
-  
-  if(!__techMappings.length){
-    container.innerHTML = '<div class="small" style="color:#666;">No tech mappings found. Add one below.</div>';
-    return;
-  }
-  
-  container.innerHTML = __techMappings.map((m, i) => `
-    <div style="display:flex;align-items:center;gap:10px;padding:10px;border:1px solid #eee;border-radius:10px;">
-      <div style="flex:1;">
-        <div style="font-weight:700;">${m.email || 'Unknown email'}</div>
-        <div class="small" style="color:#666;">User ID: ${m.user_id?.slice(0,8)}...</div>
-      </div>
-      <select class="edsel" style="width:120px;" data-idx="${i}" data-field="techName">
-        ${TECHS.filter(t => t !== 'UNASSIGNED').map(t => 
-          `<option value="${t}" ${m.tech_name === t ? 'selected' : ''}>${t}</option>`
-        ).join('')}
-      </select>
-      <label style="display:flex;align-items:center;gap:4px;font-size:12px;">
-        <input type="checkbox" data-idx="${i}" data-field="isActive" ${m.is_active ? 'checked' : ''}/>
-        Active
-      </label>
-      <button type="button" class="edbtn secondary" data-idx="${i}" data-action="delete">Delete</button>
-      <button type="button" class="edbtn" data-idx="${i}" data-action="save">Save</button>
-    </div>
-  `).join('');
-  
-  container.querySelectorAll('[data-action]').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      const idx = parseInt(e.target.dataset.idx, 10);
-      const action = e.target.dataset.action;
-      const m = __techMappings[idx];
-      if(!m) return;
-      
-      if(action === 'delete'){
-        if(!confirm(`Delete mapping for ${m.email}?`)) return;
-        const ok = await dbDeleteTechMapping(m.user_id);
-        if(ok){ __techMappings.splice(idx, 1); renderTechManageList(); alert('Deleted.'); }
-        else { alert('Delete failed.'); }
-      }
-      else if(action === 'save'){
-        const row = e.target.closest('[style*="display:flex"]');
-        const techSel = row.querySelector('[data-field="techName"]');
-        const activeCb = row.querySelector('[data-field="isActive"]');
-        const newTech = techSel?.value || m.tech_name;
-        const newActive = activeCb?.checked !== false;
-        const ok = await dbSaveTechMapping(m.user_id, newTech, newActive);
-        if(ok){ 
-          __techMappings[idx].tech_name = newTech;
-          __techMappings[idx].is_active = newActive;
-          renderTechManageList();
-          alert('Saved.'); 
-        }
-        else { alert('Save failed.'); }
-      }
-    });
-  });
-}
-
-function openManageTechsModal(){
-  const modal = document.getElementById('manageTechsModal');
-  if(!modal) return;
-  modal.style.display = 'block';
-  modal.setAttribute('aria-hidden', 'false');
-  refreshTechManageList();
-}
-
-function closeManageTechsModal(){
-  const modal = document.getElementById('manageTechsModal');
-  if(!modal) return;
-  modal.style.display = 'none';
-  modal.setAttribute('aria-hidden', 'true');
-}
-
-async function refreshTechManageList(){
-  __techMappings = await dbLoadTechMappings();
-  renderTechManageList();
-}
-
-async function addTechMapping(){
-  const emailEl = document.getElementById('newTechEmail');
-  const techEl = document.getElementById('newTechName');
-  const email = (emailEl?.value || '').trim();
-  const techName = techEl?.value || '';
-  
-  if(!email || !techName){
-    alert('Please enter email and select tech name.');
-    return;
-  }
-  
-  try{
-    const { data: { users } } = await window.sb.auth.admin.listUsers();
-    const user = (users || []).find(u => u.email?.toLowerCase() === email.toLowerCase());
-    if(!user){
-      alert(`User not found: ${email}\n\nMake sure the user has signed up first.`);
-      return;
-    }
-    
-    const ok = await dbSaveTechMapping(user.id, techName, true);
-    if(ok){
-      emailEl.value = '';
-      techEl.value = '';
-      await refreshTechManageList();
-      alert(`Mapped ${email} -> ${techName}`);
-    } else {
-      alert('Failed to save mapping.');
-    }
-  }catch(e){
-    console.error('[addTechMapping] error:', e);
-    alert('Error: ' + e.message);
-  }
-}
-
-document.getElementById('btnManageTechs')?.addEventListener('click', openManageTechsModal);
-document.getElementById('btnCloseManageTechs')?.addEventListener('click', closeManageTechsModal);
-document.getElementById('btnCloseManageTechs2')?.addEventListener('click', closeManageTechsModal);
-document.getElementById('manageTechsBackdrop')?.addEventListener('click', closeManageTechsModal);
-document.getElementById('btnRefreshTechList')?.addEventListener('click', refreshTechManageList);
-document.getElementById('btnAddTechMapping')?.addEventListener('click', addTechMapping);
 
 function exportPlanScenarioCsv(){
   if(!requireAdminAction()) return;
@@ -2643,6 +2507,169 @@ document.getElementById('planScenarioBackdrop')?.addEventListener('click', close
 document.getElementById('btnPlanApplyFromModal')?.addEventListener('click', applyPlanScenario);
 document.getElementById('btnPlanResetFromModal')?.addEventListener('click', resetToImportedData);
 document.getElementById('btnPlanExportFromModal')?.addEventListener('click', exportPlanScenarioCsv);
+
+// ---------------- Sync to Database ----------------
+async function syncToDatabase(options={}){
+  if(!requireAdminAction()) return { updated:0, failed:0, total:0 };
+  if(!window.sb){
+    if(!options.quiet) alert('Not connected to database.');
+    return { updated:0, failed:0, total:0 };
+  }
+
+  const requireConfirm = options.requireConfirm !== false;
+  const quiet = !!options.quiet;
+  const backupMode = options.backupMode || 'none'; // 'none' | 'save'
+
+  if(requireConfirm){
+    const ok = confirm('This will write current assignments to the database so techs can see their jobs. Continue?');
+    if(!ok) return { updated:0, failed:0, total:0, cancelled:true };
+  }
+
+  const updates = collectRenderedJobUpdates();
+  if(!updates.length){
+    if(!quiet) alert('No DB jobs available to sync.');
+    return { updated:0, failed:0, total:0 };
+  }
+
+  let backupSaved = false;
+  if(backupMode === 'save'){
+    const b = await saveDbBackupForUpdates(updates);
+    backupSaved = !!b.ok;
+    if(!b.ok) console.warn('[syncToDatabase] backup not saved:', b.error || 'unknown');
+  }
+
+  let success = 0;
+  let failed = 0;
+  for(const u of updates){
+    try{
+      const { error } = await window.sb
+        .from('jobs')
+        .update({ tech_name: u.tech_name, slot: u.slot, plage: u.plage, job_date: u.job_date })
+        .eq('id', u.id);
+      if(error){
+        console.warn('[syncToDatabase] error for', u.id, error);
+        failed++;
+      }else{
+        success++;
+      }
+    }catch(e){
+      console.warn('[syncToDatabase] exception for', u.id, e);
+      failed++;
+    }
+  }
+
+  const result = { updated:success, failed, total:updates.length, backupSaved };
+  if(!quiet){
+    const details = ['Sync complete!', '', `Updated: ${success}/${updates.length}`, `Failed: ${failed}`];
+    if(backupSaved) details.push('Backup saved for Reset.');
+    alert(details.join(String.fromCharCode(10)));
+  }
+  return result;
+}
+
+document.getElementById('btnSyncToDb')?.addEventListener('click', ()=>syncToDatabase({ requireConfirm:true, quiet:false, backupMode:'none' }));
+
+// ---------------- Team Mapping (Auth users -> tech) ----------------
+let __teamRows = [];
+
+async function loadTeamMappings(){
+  if(!window.sb) return [];
+  try{
+    const { data, error } = await window.sb.rpc('admin_list_user_tech_mappings');
+    if(error){
+      console.warn('[loadTeamMappings] rpc error:', error);
+      alert('Team mapping API not ready. Run db/10_user_sync_and_admin_rpc.sql once in Supabase.');
+      return [];
+    }
+    return Array.isArray(data) ? data : [];
+  }catch(e){
+    console.warn('[loadTeamMappings] exception:', e);
+    return [];
+  }
+}
+
+function openManageTeamModal(){
+  if(!requireAdminAction()) return;
+  const m=document.getElementById('manageTechsModal');
+  if(!m) return;
+  m.style.display='block';
+  m.setAttribute('aria-hidden','false');
+  refreshManageTeam();
+}
+
+function closeManageTeamModal(){
+  const m=document.getElementById('manageTechsModal');
+  if(!m) return;
+  m.style.display='none';
+  m.setAttribute('aria-hidden','true');
+}
+
+function renderManageTeam(){
+  const host=document.getElementById('manageTechsList');
+  if(!host) return;
+  const opts=['','Adil','Abdel','Chadi','Tech A','Tech B'].map(t=>`<option value="${t}">${t||'-- Unmapped --'}</option>`).join('');
+
+  if(!__teamRows.length){
+    host.innerHTML='<div class="small">No users found.</div>';
+    return;
+  }
+
+  host.innerHTML = __teamRows.map((r,i)=>`
+    <div style="display:grid;grid-template-columns:minmax(220px,1fr) 170px 80px 140px;gap:8px;align-items:center;border:1px solid #eee;border-radius:10px;padding:8px;margin-bottom:8px">
+      <div>
+        <div style="font-weight:700">${r.email||'(no email)'}</div>
+        <div class="small" style="font-family:monospace">${r.user_id}</div>
+      </div>
+      <select id="teamTech_${i}" class="edsel" style="min-width:160px">${opts}</select>
+      <label class="small" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="teamActive_${i}" ${r.mapping_active?'checked':''}/>Active</label>
+      <div style="display:flex;gap:6px">
+        <button class="edbtn" type="button" data-save-team="${i}">Save</button>
+        <button class="edbtn secondary" type="button" data-clear-team="${i}">Clear</button>
+      </div>
+    </div>
+  `).join('');
+
+  __teamRows.forEach((r,i)=>{
+    const sel=document.getElementById(`teamTech_${i}`);
+    if(sel) sel.value = r.tech_name || '';
+  });
+
+  host.querySelectorAll('[data-save-team]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const i=parseInt(btn.getAttribute('data-save-team'),10);
+      const row=__teamRows[i];
+      if(!row) return;
+      const tech=(document.getElementById(`teamTech_${i}`)?.value||'').trim();
+      const active=!!document.getElementById(`teamActive_${i}`)?.checked;
+      if(!tech){ alert('Select a tech name or click Clear.'); return; }
+      const { error } = await window.sb.rpc('admin_set_user_tech_mapping', { p_user_id: row.user_id, p_tech_name: tech, p_is_active: active });
+      if(error){ alert('Save failed: '+error.message); return; }
+      await refreshManageTeam();
+    });
+  });
+
+  host.querySelectorAll('[data-clear-team]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const i=parseInt(btn.getAttribute('data-clear-team'),10);
+      const row=__teamRows[i];
+      if(!row) return;
+      const { error } = await window.sb.rpc('admin_clear_user_tech_mapping', { p_user_id: row.user_id });
+      if(error){ alert('Clear failed: '+error.message); return; }
+      await refreshManageTeam();
+    });
+  });
+}
+
+async function refreshManageTeam(){
+  __teamRows = await loadTeamMappings();
+  renderManageTeam();
+}
+
+document.getElementById('btnManageTechs')?.addEventListener('click', openManageTeamModal);
+document.getElementById('btnCloseManageTechs')?.addEventListener('click', closeManageTeamModal);
+document.getElementById('btnCloseManageTechs2')?.addEventListener('click', closeManageTeamModal);
+document.getElementById('manageTechsBackdrop')?.addEventListener('click', closeManageTeamModal);
+document.getElementById('btnRefreshManageTechs')?.addEventListener('click', refreshManageTeam);
 
 // ---------------- Manual jobs (localStorage) ----------------
 const manualJobsKey = 'dispatch_manual_jobs_v1';
@@ -3331,9 +3358,8 @@ function setEditModeUI(){
     "btnExportOverridesJson", "btnImportOverridesJson",
     "btnExportJobsCsv", "btnImportJobsCsv",
     "btnExportAllJson", "btnImportAllJson",
-    "btnAddJob",
-    "btnManageTechs",
-    "btnPlanGenerate", "btnPlanOptimize", "btnPlanCompare", "btnPlanApply", "btnPlanReset", "btnPlanExport",
+    "btnAddJob", "btnManageTechs",
+    "btnPlanGenerate", "btnPlanOptimize", "btnPlanCompare", "btnPlanApply", "btnSyncToDb", "btnPlanReset", "btnPlanExport",
 
     // file inputs for imports
     "fileImportOverrides", "fileImportJobsCsv", "fileImportAll",
