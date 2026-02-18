@@ -682,6 +682,7 @@ Tech priority: <b>Adil</b> → <b>Abdel</b>. Capacity: 1 AM + 1 PM per tech/day.
       <input class="hiddenInput" id="fileImportOverrides" type="file" accept="application/json,.json"/>
       <input class="hiddenInput" id="fileImportAll" type="file" accept="application/json,.json"/>
       <span class="kpiHint">Core flow: Import CSV -> Generate/Optimize -> Compare -> Apply -> Export scenario CSV.</span>
+      <span class="kpiHint" id="syncStatus" style="margin-left:10px;">DB Sync: Idle</span>
     </div>
   </div>
 
@@ -2330,6 +2331,18 @@ function closePlanScenarioModal(){
 
 const dbBeforeSyncBackupKey = 'dispatch_db_before_sync_v1';
 
+function syncNowLabel(){
+  try{ return new Date().toLocaleTimeString(); }catch(e){ return ''; }
+}
+
+function setSyncStatus(message, tone='neutral'){
+  const el = document.getElementById('syncStatus');
+  if(!el) return;
+  el.textContent = `DB Sync: ${message}`;
+  const colors = { neutral:'#6b7280', ok:'#166534', warn:'#92400e', err:'#b91c1c' };
+  el.style.color = colors[tone] || colors.neutral;
+}
+
 function collectRenderedJobUpdates(){
   rebuildMonthsFromOverrides();
   const updates = [];
@@ -2432,6 +2445,11 @@ async function applyPlanScenario(){
   renderScenarioSummaryStrip();
 
   const dbResult = await syncToDatabase({ requireConfirm:false, quiet:true, backupMode:'save' });
+  if(dbResult.failed){
+    setSyncStatus(`Partial sync ${dbResult.updated}/${dbResult.total} at ${syncNowLabel()}`, 'warn');
+  }else{
+    setSyncStatus(`Synced ${dbResult.updated}/${dbResult.total} at ${syncNowLabel()}`, 'ok');
+  }
   const msg = `Scenario applied: ${__planScenario.changes.length} changes. DB synced: ${dbResult.updated}/${dbResult.total}` + (dbResult.failed ? ` (failed: ${dbResult.failed})` : '');
   alert(msg);
 }
@@ -2454,14 +2472,20 @@ async function resetToImportedData(){
     if(backup?.rows?.length){
       const restored = await restoreDbBackup();
       restoreMsg = `Restored backup: ${restored.updated} rows` + (restored.failed ? `, failed ${restored.failed}` : '');
+      setSyncStatus(`Restored backup at ${syncNowLabel()}`, restored.failed ? 'warn' : 'ok');
     }else{
       try{
         const { error } = await window.sb
           .from('jobs')
           .update({ tech_name: 'UNASSIGNED', slot: 'AM', plage: 'AM' })
           .neq('id', '00000000-0000-0000-0000-000000000000');
-        if(error) console.warn('[resetToImportedData] DB fallback reset error:', error);
-        else restoreMsg = 'No backup found. Fallback reset to imported UNASSIGNED state.';
+        if(error){
+          console.warn('[resetToImportedData] DB fallback reset error:', error);
+          setSyncStatus('Reset failed (DB error)', 'err');
+        }else{
+          restoreMsg = 'No backup found. Fallback reset to imported UNASSIGNED state.';
+          setSyncStatus(`Fallback reset at ${syncNowLabel()}`, 'warn');
+        }
       }catch(e){
         console.warn('[resetToImportedData] DB fallback reset exception:', e);
       }
@@ -2512,6 +2536,7 @@ document.getElementById('btnPlanExportFromModal')?.addEventListener('click', exp
 async function syncToDatabase(options={}){
   if(!requireAdminAction()) return { updated:0, failed:0, total:0 };
   if(!window.sb){
+    setSyncStatus('Not connected', 'err');
     if(!options.quiet) alert('Not connected to database.');
     return { updated:0, failed:0, total:0 };
   }
@@ -2522,11 +2547,16 @@ async function syncToDatabase(options={}){
 
   if(requireConfirm){
     const ok = confirm('This will write current assignments to the database so techs can see their jobs. Continue?');
-    if(!ok) return { updated:0, failed:0, total:0, cancelled:true };
+    if(!ok){
+      setSyncStatus('Cancelled', 'neutral');
+      return { updated:0, failed:0, total:0, cancelled:true };
+    }
   }
 
+  setSyncStatus('Syncing...', 'warn');
   const updates = collectRenderedJobUpdates();
   if(!updates.length){
+    setSyncStatus('No DB rows to sync', 'warn');
     if(!quiet) alert('No DB jobs available to sync.');
     return { updated:0, failed:0, total:0 };
   }
@@ -2559,6 +2589,11 @@ async function syncToDatabase(options={}){
   }
 
   const result = { updated:success, failed, total:updates.length, backupSaved };
+  if(failed){
+    setSyncStatus(`Partial sync ${success}/${updates.length} at ${syncNowLabel()}`, 'warn');
+  }else{
+    setSyncStatus(`Synced ${success}/${updates.length} at ${syncNowLabel()}`, 'ok');
+  }
   if(!quiet){
     const details = ['Sync complete!', '', `Updated: ${success}/${updates.length}`, `Failed: ${failed}`];
     if(backupSaved) details.push('Backup saved for Reset.');
@@ -3342,6 +3377,7 @@ function buildUIFromPayload(){
   activate(Object.keys(payload.months)[0]);
   renderKpis();
   wireHandlers();
+  if(window.IS_ADMIN) setSyncStatus('Idle', 'neutral');
 }
   
 function setEditModeUI(){
@@ -3358,7 +3394,7 @@ function setEditModeUI(){
     "btnExportOverridesJson", "btnImportOverridesJson",
     "btnExportJobsCsv", "btnImportJobsCsv",
     "btnExportAllJson", "btnImportAllJson",
-    "btnAddJob", "btnManageTechs",
+    "btnAddJob", "btnManageTechs", "syncStatus",
     "btnPlanGenerate", "btnPlanOptimize", "btnPlanCompare", "btnPlanApply", "btnSyncToDb", "btnPlanReset", "btnPlanExport",
 
     // file inputs for imports
