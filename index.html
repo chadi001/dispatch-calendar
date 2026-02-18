@@ -270,6 +270,47 @@ button.reset:hover{background:#f6f8ff;}
     }
   };
 
+  const featureKeys = {
+    multiTech: 'dispatch_feature_multitech_v1',
+    areaRulesEnabled: 'dispatch_feature_arearules_v1',
+    areaRules: 'dispatch_area_rules_v1'
+  };
+  let FEATURE_MULTI_TECH = false;
+  let FEATURE_AREA_RULES = false;
+  let AREA_RULES = [];
+  let __jobAssignmentsMap = {};
+
+  function loadBool(key, defVal=false){
+    try{ const v=localStorage.getItem(key); return v==null?defVal:(v==='1'||v==='true'); }catch(e){ return defVal; }
+  }
+  function saveBool(key, val){ try{ localStorage.setItem(key, val?'1':'0'); }catch(e){} }
+  function loadAreaRulesStore(){
+    try{ const arr=JSON.parse(localStorage.getItem(featureKeys.areaRules)||'[]'); return Array.isArray(arr)?arr:[]; }catch(e){ return []; }
+  }
+  function saveAreaRulesStore(){ try{ localStorage.setItem(featureKeys.areaRules, JSON.stringify(AREA_RULES||[])); }catch(e){} }
+  function regionMatch(ruleRegion, jobRegion){
+    const a = String(ruleRegion||'').trim().toLowerCase();
+    const b = String(jobRegion||'').trim().toLowerCase();
+    if(!a || !b) return false;
+    return a===b || a.includes(b) || b.includes(a);
+  }
+  function isoInRange(iso, startIso, endIso){
+    if(!iso) return false;
+    if(startIso && iso < startIso) return false;
+    if(endIso && iso > endIso) return false;
+    return true;
+  }
+  function activeRulesFor(tech, iso){
+    const t = String(tech||'').trim().toLowerCase();
+    return (AREA_RULES||[]).filter(r => r && r.active !== false && String(r.tech||'').trim().toLowerCase()===t && isoInRange(iso, r.start_date, r.end_date));
+  }
+  function syncFeatureButtons(){
+    const b1=document.getElementById('btnToggleMultiTech');
+    const b2=document.getElementById('btnToggleAreaRules');
+    if(b1) b1.textContent = `Multi-Tech: ${FEATURE_MULTI_TECH?'ON':'OFF'}`;
+    if(b2) b2.textContent = `Area Rules: ${FEATURE_AREA_RULES?'ON':'OFF'}`;
+  }
+
   function pickField(obj, keys, fallback=''){
     for(const k of (keys||[])){
       const v = obj?.[k];
@@ -371,8 +412,21 @@ button.reset:hover{background:#f6f8ff;}
   }
 
   const norm = v => String(v||'').trim().toLowerCase();
-  const filtered = rows.filter(r => norm(r.tech_name) === norm(myTech));
-  console.log("[dbLoadJobs] TECH mode rows:", rows.length, "mapped tech:", myTech, "visible:", filtered.length);
+  let extraAssigned = new Set();
+  try{
+    const { data: ja, error: jaErr } = await window.sb
+      .from('job_assignments')
+      .select('job_id,tech_name')
+      .eq('tech_name', myTech);
+    if(!jaErr && Array.isArray(ja)){
+      extraAssigned = new Set(ja.map(x=>String(x.job_id||'')).filter(Boolean));
+    }
+  }catch(e){
+    console.warn('[dbLoadJobs] job_assignments fallback err:', e);
+  }
+
+  const filtered = rows.filter(r => norm(r.tech_name) === norm(myTech) || extraAssigned.has(String(r.id||'')));
+  console.log("[dbLoadJobs] TECH mode rows:", rows.length, "mapped tech:", myTech, "via assignments:", extraAssigned.size, "visible:", filtered.length);
   return filtered;
 } // ✅ CLOSE dbLoadJobs()
 
@@ -401,6 +455,56 @@ async function dbUpdateJob(id, updates) {
   if (error) {
     console.error("DB update error:", error);
     alert("Error updating job");
+  }
+}
+
+async function dbLoadAssignmentsMap(){
+  if(!window.sb) return {};
+  try{
+    const { data, error } = await window.sb
+      .from('job_assignments')
+      .select('job_id,tech_name,role,is_primary');
+    if(error){
+      console.warn('[dbLoadAssignmentsMap] error:', error);
+      return {};
+    }
+    const out = {};
+    for(const r of (data||[])){
+      if(!r?.job_id || !r?.tech_name) continue;
+      const role = String(r.role||'').toLowerCase();
+      if(r.is_primary || role==='lead') continue;
+      if(!out[r.job_id]) out[r.job_id] = [];
+      if(!out[r.job_id].includes(r.tech_name)) out[r.job_id].push(r.tech_name);
+    }
+    return out;
+  }catch(e){
+    console.warn('[dbLoadAssignmentsMap] exception:', e);
+    return {};
+  }
+}
+
+async function dbSetJobExtraTechs(jobId, leadTech, techList){
+  if(!window.sb || !window.IS_ADMIN || !jobId) return { ok:false, error:'no admin/db/job' };
+  const clean = Array.from(new Set((techList||[]).map(t=>String(t||'').trim()).filter(Boolean)))
+    .filter(t=>t!=='UNASSIGNED' && t!==leadTech);
+  try{
+    const { error: delErr } = await window.sb
+      .from('job_assignments')
+      .delete()
+      .eq('job_id', jobId)
+      .in('role', ['team','trainee']);
+    if(delErr) return { ok:false, error:delErr.message };
+
+    if(clean.length){
+      const rows = clean.map(t=>({ job_id: jobId, tech_name:t, role:'team', is_primary:false }));
+      const { error: insErr } = await window.sb.from('job_assignments').insert(rows);
+      if(insErr) return { ok:false, error:insErr.message };
+    }
+
+    __jobAssignmentsMap[jobId] = clean;
+    return { ok:true, count:clean.length };
+  }catch(e){
+    return { ok:false, error:e.message||String(e) };
   }
 }
   // --- Bootstrap DB jobs into the existing payload calendar ----
@@ -448,6 +552,7 @@ function jobRowToPayloadItem(r){
     plage: String(pickField(r, APP_META.jobsCanonical.slot, 'AM') || 'AM'),
     tech: String(pickField(r, APP_META.jobsCanonical.tech, 'UNASSIGNED') || 'UNASSIGNED'),
     job_desc: r.job_desc || '',
+    additional_techs: (__jobAssignmentsMap && __jobAssignmentsMap[r.id]) ? (__jobAssignmentsMap[r.id].slice()) : [],
     _db_id: r.id
   };
 }
@@ -455,6 +560,7 @@ function jobRowToPayloadItem(r){
 
 async function dbBootstrapJobsIntoPayload(){
   const rows = await dbLoadJobs();
+  __jobAssignmentsMap = await dbLoadAssignmentsMap();
 
   // DB is the ONLY source of jobs -> rebuild base months from a clean template
   if(!window.payload || !payload.__monthTemplate){
@@ -661,6 +767,9 @@ Tech priority: <b>Adil</b> → <b>Abdel</b>. Capacity: 1 AM + 1 PM per tech/day.
         <summary>Advanced tools</summary>
         <div class="plannerActionsRow" style="margin-top:8px">
           <button class="reset" id="btnManageTechs" type="button">Manage team</button>
+          <button class="reset" id="btnToggleMultiTech" type="button">Multi-Tech: OFF</button>
+          <button class="reset" id="btnToggleAreaRules" type="button">Area Rules: OFF</button>
+          <button class="reset" id="btnManageAreaRules" type="button">Manage area rules</button>
           <button class="reset" id="btnExportJobsCsv" type="button">Export jobs CSV</button>
           <button class="reset" id="btnExportOverridesJson" type="button">Export overrides JSON</button>
           <button class="reset" id="btnImportOverridesJson" type="button">Import overrides JSON</button>
@@ -811,6 +920,35 @@ Tech priority: <b>Adil</b> → <b>Abdel</b>. Capacity: 1 AM + 1 PM per tech/day.
   </div>
 </div>
   
+
+
+<!-- Area Rules Modal -->
+<div id="areaRulesModal" class="modal" style="display:none" aria-hidden="true">
+  <div class="modal-backdrop" id="areaRulesBackdrop"></div>
+  <div class="modal-dialog" role="dialog" aria-modal="true" aria-label="Manage area rules">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">Area Rules</div>
+        <div class="modal-subtitle">Deploy techs by region and date period when enabled.</div>
+      </div>
+      <button type="button" class="reset" id="btnCloseAreaRules">Close</button>
+    </div>
+    <div class="modal-body">
+      <div id="areaRulesList"></div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid #eee;display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto auto;gap:8px;align-items:end;">
+        <div class="edgrp"><div class="edlbl">Tech</div><select id="arTech" class="edsel"></select></div>
+        <div class="edgrp"><div class="edlbl">Region</div><input id="arRegion" class="edsel" placeholder="Montreal" /></div>
+        <div class="edgrp"><div class="edlbl">Start</div><input id="arStart" type="date" class="edsel" /></div>
+        <div class="edgrp"><div class="edlbl">End</div><input id="arEnd" type="date" class="edsel" /></div>
+        <label class="small" style="display:flex;align-items:center;gap:6px"><input id="arStrict" type="checkbox"/>Strict</label>
+        <button type="button" class="edbtn" id="btnAddAreaRule">Add rule</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="reset" id="btnRefreshAreaRules">Refresh</button>
+      <button type="button" class="reset" id="btnCloseAreaRules2">Close</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -1031,6 +1169,10 @@ function openDrawer(drawer, title, items, iso){
     pill.appendChild(el('span',{},it.plage));
     pill.appendChild(dot);
     pill.appendChild(el('span',{},it.tech));
+    const extraTechs = Array.isArray(it.additional_techs) ? it.additional_techs : [];
+    if(extraTechs.length){
+      pill.appendChild(el('span',{class:'small',title:extraTechs.join(', ')},`+${extraTechs.length} team`));
+    }
     if(isManualLocked(kPre)) pill.appendChild(el('span',{class:'lockicon',title:'Manual lock'},'🔒'));
     line1.appendChild(pill);
     // client badge (weekly view only)
@@ -1142,6 +1284,108 @@ function openDrawer(drawer, title, items, iso){
     grp3.appendChild(lbl3);
     grp3.appendChild(dateInp);
     controls.appendChild(grp3);
+
+    // Multi-tech group (manual toggle)
+    if(FEATURE_MULTI_TECH && window.CAN_EDIT){
+      const grpM = document.createElement('div');
+      grpM.className='edgrp';
+      const lblM = document.createElement('div');
+      lblM.className='edlbl';
+      lblM.textContent='Additional techs';
+      const wrapM = document.createElement('div');
+      wrapM.className='edactions';
+      wrapM.style.flexWrap = 'wrap';
+
+      const currentExtras = Array.isArray(it.additional_techs) ? it.additional_techs.slice() : [];
+      const extrasState = currentExtras.filter(t=>t && t!=='UNASSIGNED' && t!==it.tech);
+
+      const extraSel = document.createElement('select');
+      extraSel.className='edsel';
+      extraSel.style.minWidth='130px';
+      const ph = document.createElement('option');
+      ph.value=''; ph.textContent='Add tech...';
+      extraSel.appendChild(ph);
+      TECHS.filter(t=>t!=='UNASSIGNED' && t!==it.tech).forEach(t=>{
+        const op=document.createElement('option');
+        op.value=t; op.textContent=t;
+        extraSel.appendChild(op);
+      });
+
+      const addExtraBtn = document.createElement('button');
+      addExtraBtn.type='button';
+      addExtraBtn.className='edbtn';
+      addExtraBtn.textContent='Add';
+
+      const chips = document.createElement('div');
+      chips.style.display='flex';
+      chips.style.gap='6px';
+      chips.style.flexWrap='wrap';
+
+      function renderExtraChips(){
+        chips.innerHTML='';
+        if(!extrasState.length){
+          chips.appendChild(el('span',{class:'small'},'None'));
+          return;
+        }
+        for(const t of extrasState){
+          const chip = document.createElement('span');
+          chip.className='small';
+          chip.style.border='1px solid #ddd';
+          chip.style.padding='2px 6px';
+          chip.style.borderRadius='999px';
+          chip.textContent=t;
+          const rm = document.createElement('button');
+          rm.type='button';
+          rm.className='edbtn secondary';
+          rm.style.marginLeft='6px';
+          rm.textContent='x';
+          rm.onclick=()=>{
+            const idx = extrasState.indexOf(t);
+            if(idx>=0) extrasState.splice(idx,1);
+            renderExtraChips();
+          };
+          chip.appendChild(rm);
+          chips.appendChild(chip);
+        }
+      }
+      renderExtraChips();
+
+      addExtraBtn.onclick=()=>{
+        const t = String(extraSel.value||'').trim();
+        if(!t) return;
+        if(t===it.tech) return;
+        if(!extrasState.includes(t)) extrasState.push(t);
+        extraSel.value='';
+        renderExtraChips();
+      };
+
+      const saveExtrasBtn = document.createElement('button');
+      saveExtrasBtn.type='button';
+      saveExtrasBtn.className='edbtn';
+      saveExtrasBtn.textContent='Save team';
+      saveExtrasBtn.onclick=async ()=>{
+        const dbId = String(it._db_id || '').trim();
+        if(!dbId){ alert('Cannot save team: missing DB job id.'); return; }
+        const out = await dbSetJobExtraTechs(dbId, it.tech, extrasState);
+        if(!out.ok){ alert('Save team failed: ' + (out.error||'unknown')); return; }
+        it.additional_techs = extrasState.slice();
+        rerenderActive();
+        try{
+          const midOpen = String(parseInt((iso||'').slice(5,7),10));
+          const mmOpen = payload.months[midOpen];
+          const refreshed = itemsForDate(mmOpen, iso, currentFilters());
+          openDrawer(drawer, `Jobs for ${iso} (${refreshed.length})`, refreshed, iso);
+        }catch(e){}
+      };
+
+      wrapM.appendChild(extraSel);
+      wrapM.appendChild(addExtraBtn);
+      wrapM.appendChild(saveExtrasBtn);
+      grpM.appendChild(lblM);
+      grpM.appendChild(wrapM);
+      grpM.appendChild(chips);
+      controls.appendChild(grpM);
+    }
 
     // Consolidated Apply/Reset (Tech + AM/PM + Date)
     const grpA = document.createElement('div');
@@ -1429,7 +1673,9 @@ function makePanel(mid, m){
             tt.style.background = techColors[it.tech] || '#777';
             const weeklyPostal = (it.postal_code || extractPostalCode(it.destination || '') || '').trim();
             const postalTxt = weeklyPostal ? ` | ${weeklyPostal}` : '';
-            const txt=el('span',{class:'txt'}, `${it.site||''} | ${it.wo||''}${postalTxt}`);
+            const extraN = Array.isArray(it.additional_techs) ? it.additional_techs.length : 0;
+            const teamTxt = extraN ? ` | +${extraN} team` : '';
+            const txt=el('span',{class:'txt'}, `${it.site||''} | ${it.wo||''}${postalTxt}${teamTxt}`);
             meta.appendChild(ptag); meta.appendChild(tt); meta.appendChild(txt);
             link.appendChild(meta);
             td.appendChild(link);
@@ -2002,6 +2248,28 @@ function techPriorityForDate(iso, unavailable){
   return base.filter(t => !isTechUnavailable(t, iso, unavailable));
 }
 
+function areaRuleAdjustment(job, candIso, candTech){
+  if(!FEATURE_AREA_RULES || !candTech || candTech==='UNASSIGNED') return 0;
+  const rules = activeRulesFor(candTech, candIso);
+  if(!rules.length) return 0;
+  const reg = String(job.region || job.city || '').trim();
+  let adj = 0;
+  for(const r of rules){
+    const isMatch = regionMatch(r.region, reg);
+    if(isMatch) adj -= 120;
+    else adj += (r.strict ? 400 : 160);
+  }
+  return adj;
+}
+
+function violatesStrictAreaRule(job, candIso, candTech){
+  if(!FEATURE_AREA_RULES || !candTech || candTech==='UNASSIGNED') return false;
+  const strictRules = activeRulesFor(candTech, candIso).filter(r=>!!r.strict);
+  if(!strictRules.length) return false;
+  const reg = String(job.region || job.city || '').trim();
+  return !strictRules.some(r => regionMatch(r.region, reg));
+}
+
 function collectJobsForPlanning(){
   rebuildMonthsFromOverrides();
   const jobs=[];
@@ -2080,13 +2348,15 @@ function scorePlacement(job, candIso, candTech, candSlot, index, optimize){
   if(bestPartner===2) s -= 70;
   else if(bestPartner===1) s -= 30;
 
+  s += areaRuleAdjustment(job, candIso, candTech);
   if(!optimize) s += dateShift*20;
   if(cityNearHq(job.city) && dateShift>0) s += 4;
   return s;
 }
 
-function feasible(index, iso, tech, slot){
+function feasible(index, iso, tech, slot, job){
   if(tech==='UNASSIGNED') return true;
+  if(job && violatesStrictAreaRule(job, iso, tech)) return false;
   const cell = index[iso]?.[tech];
   const taken = cell ? (cell[slot]||0) : 0;
   if(taken>=1) return false;
@@ -2129,7 +2399,7 @@ function computePlanScenario(jobs, unavailable, optimize){
       const techCandidates = priority.concat(['UNASSIGNED']);
       for(const candTech of techCandidates){
         for(const candSlot of slots){
-          if(!feasible(idx, candIso, candTech, candSlot)) continue;
+          if(!feasible(idx, candIso, candTech, candSlot, job)) continue;
           let sc = scorePlacement(job, candIso, candTech, candSlot, idx, optimize);
           if(!optimize && candIso!==job.iso) sc += 9999;
           if(isUnassignedTech(job.tech) && !isUnassignedTech(candTech) && candIso===job.iso) sc -= 500;
@@ -2735,6 +3005,128 @@ document.getElementById('btnCloseManageTechs2')?.addEventListener('click', close
 document.getElementById('manageTechsBackdrop')?.addEventListener('click', closeManageTeamModal);
 document.getElementById('btnRefreshManageTechs')?.addEventListener('click', refreshManageTeam);
 
+// ---------------- Feature Toggles + Area Rules ----------------
+function setFeatureButtonStyles(){
+  const b1=document.getElementById('btnToggleMultiTech');
+  const b2=document.getElementById('btnToggleAreaRules');
+  if(b1) b1.style.background = FEATURE_MULTI_TECH ? '#065f46' : '';
+  if(b1) b1.style.color = FEATURE_MULTI_TECH ? '#fff' : '';
+  if(b2) b2.style.background = FEATURE_AREA_RULES ? '#7c2d12' : '';
+  if(b2) b2.style.color = FEATURE_AREA_RULES ? '#fff' : '';
+}
+
+function applyFeatureUiState(){
+  syncFeatureButtons();
+  setFeatureButtonStyles();
+}
+
+function toggleMultiTech(){
+  if(!requireAdminAction()) return;
+  FEATURE_MULTI_TECH = !FEATURE_MULTI_TECH;
+  saveBool(featureKeys.multiTech, FEATURE_MULTI_TECH);
+  applyFeatureUiState();
+  rerenderActive();
+}
+
+function toggleAreaRules(){
+  if(!requireAdminAction()) return;
+  FEATURE_AREA_RULES = !FEATURE_AREA_RULES;
+  saveBool(featureKeys.areaRulesEnabled, FEATURE_AREA_RULES);
+  applyFeatureUiState();
+  alert(`Area rules ${FEATURE_AREA_RULES?'enabled':'disabled'}.`);
+}
+
+function areaRuleRowHtml(r, i){
+  const strict = r.strict ? 'Yes' : 'No';
+  const active = r.active===false ? 'No' : 'Yes';
+  return `<div style="display:grid;grid-template-columns:130px 1fr 120px 120px 70px 70px auto;gap:8px;align-items:center;border:1px solid #eee;border-radius:10px;padding:8px;margin-bottom:6px">
+    <div><b>${r.tech||''}</b></div>
+    <div>${r.region||''}</div>
+    <div class="small">${r.start_date||'--'}</div>
+    <div class="small">${r.end_date||'--'}</div>
+    <div class="small">${strict}</div>
+    <div class="small">${active}</div>
+    <div style="display:flex;gap:6px"><button class="edbtn secondary" type="button" data-toggle-ar="${i}">Toggle</button><button class="edbtn secondary" type="button" data-del-ar="${i}">Delete</button></div>
+  </div>`;
+}
+
+function renderAreaRules(){
+  const host=document.getElementById('areaRulesList');
+  if(!host) return;
+  if(!AREA_RULES.length){
+    host.innerHTML='<div class="small">No rules yet. Add one below.</div>';
+  }else{
+    host.innerHTML = AREA_RULES.map((r,i)=>areaRuleRowHtml(r,i)).join('');
+  }
+  host.querySelectorAll('[data-toggle-ar]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const i=parseInt(btn.getAttribute('data-toggle-ar'),10);
+      if(!AREA_RULES[i]) return;
+      AREA_RULES[i].active = !(AREA_RULES[i].active!==false);
+      saveAreaRulesStore();
+      renderAreaRules();
+    });
+  });
+  host.querySelectorAll('[data-del-ar]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const i=parseInt(btn.getAttribute('data-del-ar'),10);
+      if(i<0 || i>=AREA_RULES.length) return;
+      AREA_RULES.splice(i,1);
+      saveAreaRulesStore();
+      renderAreaRules();
+    });
+  });
+}
+
+function refreshAreaRuleTechOptions(){
+  const sel=document.getElementById('arTech');
+  if(!sel) return;
+  sel.innerHTML='';
+  TECHS.filter(t=>t!=='UNASSIGNED').forEach(t=>{
+    const o=document.createElement('option');
+    o.value=t; o.textContent=t; sel.appendChild(o);
+  });
+}
+
+function openAreaRulesModal(){
+  if(!requireAdminAction()) return;
+  const m=document.getElementById('areaRulesModal');
+  if(!m) return;
+  refreshAreaRuleTechOptions();
+  renderAreaRules();
+  m.style.display='block';
+  m.setAttribute('aria-hidden','false');
+}
+
+function closeAreaRulesModal(){
+  const m=document.getElementById('areaRulesModal');
+  if(!m) return;
+  m.style.display='none';
+  m.setAttribute('aria-hidden','true');
+}
+
+function addAreaRule(){
+  const tech = String(document.getElementById('arTech')?.value||'').trim();
+  const region = String(document.getElementById('arRegion')?.value||'').trim();
+  const start_date = String(document.getElementById('arStart')?.value||'').trim();
+  const end_date = String(document.getElementById('arEnd')?.value||'').trim();
+  const strict = !!document.getElementById('arStrict')?.checked;
+  if(!tech || !region){ alert('Tech and region are required.'); return; }
+  AREA_RULES.push({ id: `AR-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, tech, region, start_date, end_date, strict, active:true });
+  saveAreaRulesStore();
+  renderAreaRules();
+}
+
+document.getElementById('btnToggleMultiTech')?.addEventListener('click', toggleMultiTech);
+document.getElementById('btnToggleAreaRules')?.addEventListener('click', toggleAreaRules);
+document.getElementById('btnManageAreaRules')?.addEventListener('click', openAreaRulesModal);
+document.getElementById('btnCloseAreaRules')?.addEventListener('click', closeAreaRulesModal);
+document.getElementById('btnCloseAreaRules2')?.addEventListener('click', closeAreaRulesModal);
+document.getElementById('areaRulesBackdrop')?.addEventListener('click', closeAreaRulesModal);
+document.getElementById('btnRefreshAreaRules')?.addEventListener('click', renderAreaRules);
+document.getElementById('btnAddAreaRule')?.addEventListener('click', addAreaRule);
+applyFeatureUiState();
+
 // ---------------- Manual jobs (localStorage) ----------------
 const manualJobsKey = 'dispatch_manual_jobs_v1';
 function loadManualJobs(){
@@ -3216,6 +3608,10 @@ try{ techOverrides  = JSON.parse(localStorage.getItem(techOverridesKey)  || '{}'
 try{ plageOverrides = JSON.parse(localStorage.getItem(plageOverridesKey) || '{}') || {}; }catch(e){ plageOverrides = {}; }
 try{ dateOverrides  = JSON.parse(localStorage.getItem(dateOverridesKey)  || '{}') || {}; }catch(e){ dateOverrides = {}; }
 
+FEATURE_MULTI_TECH = loadBool(featureKeys.multiTech, false);
+FEATURE_AREA_RULES = loadBool(featureKeys.areaRulesEnabled, false);
+AREA_RULES = loadAreaRulesStore();
+
 // Override key schema migration (v2): keys now prefer DB ids to avoid collisions
 const overrideKeySchemaVersionKey = 'dispatch_override_key_schema_v';
 const overrideKeySchemaVersion = '2';
@@ -3423,7 +3819,7 @@ function setEditModeUI(){
     "btnExportOverridesJson", "btnImportOverridesJson",
     "btnExportJobsCsv", "btnImportJobsCsv",
     "btnExportAllJson", "btnImportAllJson",
-    "btnAddJob", "btnManageTechs", "syncStatus",
+    "btnAddJob", "btnManageTechs", "btnToggleMultiTech", "btnToggleAreaRules", "btnManageAreaRules", "syncStatus",
     "btnPlanGenerate", "btnPlanOptimize", "btnPlanCompare", "btnPlanApply", "btnSyncToDb", "btnPlanReset", "btnPlanExport",
 
     // file inputs for imports
@@ -3432,6 +3828,7 @@ function setEditModeUI(){
     // add-job modal controls
     "btnCloseAddJob", "btnAddJobCancel", "btnAddJobConfirm",
     "btnClosePlanScenario", "btnPlanApplyFromModal", "btnPlanResetFromModal", "btnPlanExportFromModal",
+    "btnCloseAreaRules", "btnCloseAreaRules2", "btnRefreshAreaRules", "btnAddAreaRule", "arTech", "arRegion", "arStart", "arEnd", "arStrict",
     "aj_client","aj_site","aj_wo","aj_province","aj_city","aj_address","aj_date","aj_plage","aj_tech","aj_keepOpen"
   ];
 
