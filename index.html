@@ -334,55 +334,13 @@ button.reset:hover{background:#f6f8ff;}
     console.warn("[dbLoadJobs] admin check exception:", e);
   }
 
-  // 2) Tech users: resolve a tech identifier for this auth user
-  // Prefer tech_profiles.display_name (or tech_code as fallback), else fallback to tech_name_map.tech_name
-  let myTech = null;
-
-  try{
-    const { data: tp, error: tpErr } = await window.sb
-      .from("tech_profiles")
-      .select("display_name, tech_code")
-      .eq("user_id", user.id)
-      .eq("is_active", true)
-      .maybeSingle();
-
-    if(tpErr) console.warn("[dbLoadJobs] tech_profiles err:", tpErr);
-    myTech = (tp?.display_name && tp.display_name.trim()) ? tp.display_name.trim()
-           : (tp?.tech_code && tp.tech_code.trim()) ? tp.tech_code.trim()
-           : null;
-
-    console.log("[dbLoadJobs] tech_profiles:", tp, "resolved myTech:", myTech);
-  }catch(e){
-    console.warn("[dbLoadJobs] tech_profiles exception:", e);
-  }
-
-  if(!myTech){
-    const { data: mapRow, error: mapErr } = await window.sb
-      .from("tech_name_map")
-      .select("tech_name")
-      .eq("user_id", user.id)
-      .eq("is_active", true)
-      .maybeSingle();
-
-    console.log("[dbLoadJobs] tech_name_map:", mapRow, "err:", mapErr);
-    if (mapErr) throw mapErr;
-    myTech = mapRow?.tech_name || null;
-  }
-
-  if (!myTech) {
-    console.warn("[dbLoadJobs] No tech mapping for this user_id:", user.id);
-    return [];
-  }
-
-  // 3) Load only jobs for that tech
-  // IMPORTANT: tech_name in jobs table matches myTech
+  // 2) Tech users: rely on RLS to return only allowed rows
   const { data, error } = await window.sb
     .from("jobs")
     .select("*")
-    .eq("cancelled", false)
-    .eq("tech_name", myTech);
+    .eq("cancelled", false);
 
-  console.log("[dbLoadJobs] filter tech_name =", myTech, "rows:", data?.length, "err:", error);
+  console.log("[dbLoadJobs] TECH mode rows:", data?.length, "err:", error);
 
   if (error) throw error;
   return data || [];
@@ -455,6 +413,7 @@ function jobRowToPayloadItem(r){
     province: r.province || '',
     region: String(pickField(r, APP_META.jobsCanonical.city, '') || ''),
     destination: dest,
+    postal_code: r.postal_code || '',
     url: mapUrl,
     plage: String(pickField(r, APP_META.jobsCanonical.slot, 'AM') || 'AM'),
     tech: String(pickField(r, APP_META.jobsCanonical.tech, 'UNASSIGNED') || 'UNASSIGNED'),
@@ -1039,6 +998,7 @@ function openDrawer(drawer, title, items, iso){
     ct.textContent = c || '—';
     line1.appendChild(ct);
     line1.appendChild(el('span',{class:'small'},it.region||''));
+    if(it.postal_code) line1.appendChild(el('span',{class:'small',title:'Postal code'},it.postal_code));
     line1.appendChild(el('span',{},it.site||''));
     line1.appendChild(el('span',{class:'small'},it.wo||''));
     if(isCancelled){ line1.appendChild(el('span',{class:'cancelPill'},'CANCELLED')); }
@@ -1113,7 +1073,9 @@ function openDrawer(drawer, title, items, iso){
     if(isCancelled){ delete cancelOverrides[k]; } else { cancelOverrides[k]=true; }
     saveOverrides();
     rerenderActive();
-      try{ const refreshed = itemsForDate(iso); openDrawer(drawer, `Jobs for ${iso} (${refreshed.length})`, refreshed, iso); }catch(e){}
+      try{ const midOpen = String(parseInt(iso.slice(5,7),10));
+        const mmOpen = payload.months[midOpen];
+        const refreshed = itemsForDate(mmOpen, iso, currentFilters()); openDrawer(drawer, `Jobs for ${iso} (${refreshed.length})`, refreshed, iso); }catch(e){}
     };
     actionsS.appendChild(btnCancel);
     grpS.appendChild(lblS);
@@ -1191,27 +1153,39 @@ if(!window.CAN_EDIT){
 
       rerenderActive();
 
-      // Validate constraints: max 2 jobs per tech/day and max 1 per slot (AM/PM) per tech/day.
+      // Validate constraints: max 2 jobs/day/tech and max 1 job per slot (AM/PM)/tech.
+      let targetIso = (dateOverrides[k] || iso);
+      let targetTech = (techOverrides[k] || it.tech);
+      let targetPlage = (plageOverrides[k] || it.plage);
       try{
-        const targetIso = (dateOverrides[k] || iso);
-        const targetTech = (techOverrides[k] || it.tech);
-        const targetPlage = (plageOverrides[k] || it.plage);
         if(targetTech && targetTech !== 'UNASSIGNED'){
-          const dayArr = getDaySchedule(targetIso);
-          const cnt = techCount(dayArr, targetTech);
-          const slotCnt = dayArr.filter(x => (x.tech||'')===targetTech && (x.plage||'')===targetPlage).length;
-          if(cnt > 2 || slotCnt > 1){
-            // Mark as UNASSIGNED (problem) and alert
-            setTechOverride(k, 'UNASSIGNED');
-            alert(`Conflit: ${targetTech} dépasse la capacité (max 2/jour et 1 par plage). Intervention mise UNASSIGNED.`);
+          const dayArrRaw = getDaySchedule(targetIso) || [];
+          const dayArr = dayArrRaw.filter(x=>!cancelOverrides[jobKey(x, targetIso)]);
+          const selfId = String(it._db_id || it.id || '').trim();
+          const others = dayArr.filter(x => String(x._db_id || x.id || '').trim() !== selfId);
+          const projectedCount = others.filter(x => (x.tech||'')===targetTech).length + 1;
+          const projectedSlotCount = others.filter(x => (x.tech||'')===targetTech && (x.plage||'')===targetPlage).length + 1;
+          if(projectedCount > 2 || projectedSlotCount > 1){
+            clearTechOverride(k);
+            clearPlageOverride(k);
+            clearDateOverride(k);
             rerenderActive();
+            alert(`Capacity conflict for ${targetTech}: max 2/day and max 1 per slot. Try another slot/date.`);
+            targetIso = iso;
+            targetTech = it.tech;
+            targetPlage = it.plage;
           }
         }
       }catch(e){}
       try{
-        // if the job moved away from the currently open day, refresh the drawer to current day
-        const refreshed = itemsForDate(iso);
-        openDrawer(drawer, `Jobs for ${iso} (${refreshed.length})`, refreshed, iso);
+        const refreshIso = targetIso || iso;
+        const refreshMid = String(parseInt(refreshIso.slice(5,7),10));
+        if(document.getElementById('panel-'+refreshMid) && !document.getElementById('panel-'+refreshMid).classList.contains('active')){
+          activate(refreshMid);
+        }
+        const mmOpen = payload.months[refreshMid];
+        const refreshed = itemsForDate(mmOpen, refreshIso, currentFilters());
+        openDrawer(drawer, `Jobs for ${refreshIso} (${refreshed.length})`, refreshed, refreshIso);
       }catch(e){}
     };
 
@@ -1228,7 +1202,9 @@ if(!window.CAN_EDIT){
       
 
       try{
-        const refreshed = itemsForDate(iso);
+        const midOpen = String(parseInt(iso.slice(5,7),10));
+        const mmOpen = payload.months[midOpen];
+        const refreshed = itemsForDate(mmOpen, iso, currentFilters());
         openDrawer(drawer, `Jobs for ${iso} (${refreshed.length})`, refreshed, iso);
       }catch(e){}
     };
@@ -1400,7 +1376,8 @@ function makePanel(mid, m){
             const ptag=el('span',{class: it.plage==='PM'?'pmtag':'amtag'}, it.plage);
             const tt=el('span',{class:'techtag'}, it.tech);
             tt.style.background = techColors[it.tech] || '#777';
-            const txt=el('span',{class:'txt'}, `${it.site||''} | ${it.wo||''}`);
+            const postalTxt = it.postal_code ? ` | ${it.postal_code}` : '';
+            const txt=el('span',{class:'txt'}, `${it.site||''} | ${it.wo||''}${postalTxt}`);
             meta.appendChild(ptag); meta.appendChild(tt); meta.appendChild(txt);
             link.appendChild(meta);
             td.appendChild(link);

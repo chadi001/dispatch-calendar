@@ -20,7 +20,7 @@ as $$
     where user_id = auth.uid() and is_active = true
     limit 1
   )
-  select coalesce((select tech_name from tp), (select tech_name from tm));
+  select nullif(btrim(coalesce((select tech_name from tp), (select tech_name from tm))), '');
 $$;
 
 create or replace function public.is_admin_user()
@@ -55,12 +55,12 @@ drop policy if exists jobs_tech_select_own on public.jobs;
 create policy jobs_tech_select_own on public.jobs
 for select
 using (
-  coalesce(tech_name,'') = coalesce(public.current_tech_name(),'')
+  lower(btrim(coalesce(tech_name,''))) = lower(btrim(coalesce(public.current_tech_name(),'')))
   or exists (
     select 1
     from public.job_assignments ja
     where ja.job_id = jobs.id
-      and ja.tech_name = public.current_tech_name()
+      and lower(btrim(coalesce(ja.tech_name,''))) = lower(btrim(coalesce(public.current_tech_name(),'')))
   )
 );
 
