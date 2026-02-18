@@ -334,16 +334,46 @@ button.reset:hover{background:#f6f8ff;}
     console.warn("[dbLoadJobs] admin check exception:", e);
   }
 
-  // 2) Tech users: rely on RLS to return only allowed rows
+  // 2) Tech users: RLS first + local safeguard filter by mapped tech
+  let myTech = null;
+  try{
+    const { data: techName, error: fnErr } = await window.sb.rpc('current_tech_name');
+    if(!fnErr && typeof techName === 'string') myTech = techName;
+  }catch(e){
+    console.warn('[dbLoadJobs] current_tech_name rpc unavailable:', e);
+  }
+
+  if(!myTech){
+    try{
+      const { data: mapRow, error: mapErr } = await window.sb
+        .from('tech_name_map')
+        .select('tech_name')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
+      if(!mapErr && mapRow?.tech_name) myTech = mapRow.tech_name;
+    }catch(e){
+      console.warn('[dbLoadJobs] tech_name_map fallback err:', e);
+    }
+  }
+
   const { data, error } = await window.sb
     .from("jobs")
     .select("*")
     .eq("cancelled", false);
 
-  console.log("[dbLoadJobs] TECH mode rows:", data?.length, "err:", error);
-
   if (error) throw error;
-  return data || [];
+
+  const rows = data || [];
+  if(!myTech){
+    console.warn('[dbLoadJobs] no mapping resolved; returning empty for safety');
+    return [];
+  }
+
+  const norm = v => String(v||'').trim().toLowerCase();
+  const filtered = rows.filter(r => norm(r.tech_name) === norm(myTech));
+  console.log("[dbLoadJobs] TECH mode rows:", rows.length, "mapped tech:", myTech, "visible:", filtered.length);
+  return filtered;
 } // ✅ CLOSE dbLoadJobs()
 
 
@@ -935,12 +965,24 @@ function matchFilters(it, filters){
   return true;
 }
 function plageSort(p){ return p==="AM"?0:(p==="PM"?1:2); }
+function extractPostalCode(text){
+  const s = String(text||'');
+  const m = s.match(/\b([A-Za-z]\d[A-Za-z])[ -]?(\d[A-Za-z]\d)\b/);
+  if(!m) return '';
+  return `${m[1].toUpperCase()} ${m[2].toUpperCase()}`;
+}
 
 function itemsForDate(m, iso, filters){
   const all=(m.date_index && m.date_index[iso]) ? m.date_index[iso] : [];
   const normalized = all.map(it=>normalizeDisplayItem(it, iso));
   const arr=normalized.filter(it=>matchFilters(it,filters));
-  arr.sort((a,b)=>plageSort(a.plage)-plageSort(b.plage) || (a.tech||"").localeCompare(b.tech||""));
+  // Day details ordering: tech first, then slot, then area/site for easier manual dispatch.
+  arr.sort((a,b)=>
+    (a.tech||"").localeCompare(b.tech||"") ||
+    plageSort(a.plage)-plageSort(b.plage) ||
+    (a.region||"").localeCompare(b.region||"") ||
+    (a.site||"").localeCompare(b.site||"")
+  );
   return arr;
 }
 function dailyRoute(items){
@@ -998,7 +1040,8 @@ function openDrawer(drawer, title, items, iso){
     ct.textContent = c || '—';
     line1.appendChild(ct);
     line1.appendChild(el('span',{class:'small'},it.region||''));
-    if(it.postal_code) line1.appendChild(el('span',{class:'small',title:'Postal code'},it.postal_code));
+    const drawerPostal = (it.postal_code || extractPostalCode(it.destination || '') || '').trim();
+    if(drawerPostal) line1.appendChild(el('span',{class:'small',title:'Postal code'},drawerPostal));
     line1.appendChild(el('span',{},it.site||''));
     line1.appendChild(el('span',{class:'small'},it.wo||''));
     if(isCancelled){ line1.appendChild(el('span',{class:'cancelPill'},'CANCELLED')); }
@@ -1166,11 +1209,19 @@ if(!window.CAN_EDIT){
           const projectedCount = others.filter(x => (x.tech||'')===targetTech).length + 1;
           const projectedSlotCount = others.filter(x => (x.tech||'')===targetTech && (x.plage||'')===targetPlage).length + 1;
           if(projectedCount > 2 || projectedSlotCount > 1){
+            const reasons = [];
+            if(projectedCount > 2){
+              reasons.push(`Daily limit reached for ${targetTech} on ${targetIso}: ${projectedCount} planned (max 2).`);
+            }
+            if(projectedSlotCount > 1){
+              reasons.push(`Slot conflict: ${targetTech} already has a ${targetPlage} job on ${targetIso} (max 1 per slot).`);
+            }
             clearTechOverride(k);
             clearPlageOverride(k);
             clearDateOverride(k);
             rerenderActive();
-            alert(`Capacity conflict for ${targetTech}: max 2/day and max 1 per slot. Try another slot/date.`);
+            const nl = String.fromCharCode(10);
+            alert('Cannot apply this change:' + nl + nl + reasons.join(nl) + nl + nl + 'Please choose another tech, slot, or date.');
             targetIso = iso;
             targetTech = it.tech;
             targetPlage = it.plage;
@@ -1376,7 +1427,8 @@ function makePanel(mid, m){
             const ptag=el('span',{class: it.plage==='PM'?'pmtag':'amtag'}, it.plage);
             const tt=el('span',{class:'techtag'}, it.tech);
             tt.style.background = techColors[it.tech] || '#777';
-            const postalTxt = it.postal_code ? ` | ${it.postal_code}` : '';
+            const weeklyPostal = (it.postal_code || extractPostalCode(it.destination || '') || '').trim();
+            const postalTxt = weeklyPostal ? ` | ${weeklyPostal}` : '';
             const txt=el('span',{class:'txt'}, `${it.site||''} | ${it.wo||''}${postalTxt}`);
             meta.appendChild(ptag); meta.appendChild(tt); meta.appendChild(txt);
             link.appendChild(meta);
