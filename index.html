@@ -713,6 +713,14 @@ Tech priority: <b>Adil</b> → <b>Abdel</b>. Capacity: 1 AM + 1 PM per tech/day.
       <option value="ALL">All</option>
     </select>
   </div>
+  <div class="field">
+    <label for="clientFilter">Client</label>
+    <select id="clientFilter">
+      <option value="ALL">All</option>
+      <option value="GOCO">GOCO</option>
+      <option value="MCN">MCN</option>
+    </select>
+  </div>
   <div class="chk">
     <input type="checkbox" id="problemsOnly"/>
     <label for="problemsOnly" style="font-size:13px;margin:0;">Problems only (UNASSIGNED)</label>
@@ -780,6 +788,7 @@ Tech priority: <b>Adil</b> → <b>Abdel</b>. Capacity: 1 AM + 1 PM per tech/day.
       <input class="hiddenInput" id="fileImportOverrides" type="file" accept="application/json,.json"/>
       <input class="hiddenInput" id="fileImportAll" type="file" accept="application/json,.json"/>
       <span class="kpiHint">Core flow: Import CSV -> Generate/Optimize -> Compare -> Apply -> Export scenario CSV.</span>
+      <span class="kpiHint">Legend: <b>+N team</b> = extra techs on a job, <b>Area Rules (Strict)</b> blocks off-region assignment, optimizer may set <b>UNASSIGNED</b> when constraints conflict.</span>
       <span class="kpiHint" id="syncStatus" style="margin-left:10px;">DB Sync: Idle</span>
     </div>
   </div>
@@ -1014,6 +1023,7 @@ if (window.USE_DB_JOBS === false) applyManualJobsToPayload();
 const tabs=document.getElementById('tabs');
 const content=document.getElementById('content');
 const regionFilter=document.getElementById('regionFilter');
+const clientFilter=document.getElementById('clientFilter');
 const problemsOnly=document.getElementById('problemsOnly');
 const showCancelled=document.getElementById('showCancelled');
 const resetBtn=document.getElementById('resetBtn');
@@ -1073,7 +1083,13 @@ function populateFilters(){
 
 function selectedTechs(){ return Array.from(document.querySelectorAll("#techChecks input[type=checkbox]:checked")).map(x=>x.value); }
 function currentFilters(){
-  return {techs:selectedTechs(), region:regionFilter.value, problemsOnly:problemsOnly.checked, showCancelled: (document.getElementById('showCancelled')||{checked:false}).checked};
+  return {
+    techs:selectedTechs(),
+    region:regionFilter.value,
+    client:(clientFilter?.value || 'ALL'),
+    problemsOnly:problemsOnly.checked,
+    showCancelled:(document.getElementById('showCancelled')||{checked:false}).checked
+  };
 }
 function effectiveTechFor(it, iso){
   const k = jobKey(it, iso||'');
@@ -1099,6 +1115,10 @@ function matchFilters(it, filters){
   if(!filters.showCancelled && it._cancelled) return false;
   if(filters.techs.length>0 && !filters.techs.includes(it.tech)) return false;
   if(filters.region!=="ALL" && it.region!==filters.region) return false;
+  if((filters.client||'ALL') !== 'ALL'){
+    const c = String(it.client||'').trim().toUpperCase();
+    if(c !== String(filters.client).trim().toUpperCase()) return false;
+  }
   if(filters.problemsOnly && !it.unassigned) return false;
   return true;
 }
@@ -1748,7 +1768,7 @@ function renderKpis(){
   // Year-to-date total (all interventions, excluding cancelled)
   const yEl=document.getElementById('yearTotal');
   if(yEl){
-    const allFilters={techs:[], region:"ALL", problemsOnly:false, showCancelled:false};
+    const allFilters={techs:[], region:"ALL", client:"ALL", problemsOnly:false, showCancelled:false};
     const allItems=collectAllItems(allFilters);
     yEl.textContent = `Year total: ${allItems.length}`;
   }
@@ -3771,11 +3791,13 @@ function rebuildMonthsFromOverrides(){
 // Build UI (DB-aware bootstrap)
 function wireHandlers(){
 regionFilter.onchange=rerenderActive;
+if(clientFilter) clientFilter.onchange=rerenderActive;
 problemsOnly.onchange=rerenderActive;
 showCancelled.onchange=rerenderActive;
 resetBtn.onclick=()=>{
   document.querySelectorAll("#techChecks input[type=checkbox]").forEach(cb=>cb.checked=false);
   regionFilter.value='ALL';
+  if(clientFilter) clientFilter.value='ALL';
   problemsOnly.checked=false;
   if(showCancelled) showCancelled.checked=false;
   rerenderActive();
