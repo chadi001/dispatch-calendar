@@ -1191,7 +1191,9 @@ function openDrawer(drawer, title, items, iso){
     pill.appendChild(el('span',{},it.tech));
     const extraTechs = Array.isArray(it.additional_techs) ? it.additional_techs : [];
     if(extraTechs.length){
-      pill.appendChild(el('span',{class:'small',title:extraTechs.join(', ')},`+${extraTechs.length} team`));
+      const teamNames = [it.tech].concat(extraTechs).join(', ');
+      pill.appendChild(el('span',{class:'small',title:`Team: ${teamNames}`},`+${extraTechs.length} team`));
+      line1.appendChild(el('span',{class:'small',title:`Team: ${teamNames}`},`TEAM: ${it.tech} +${extraTechs.length}`));
     }
     if(isManualLocked(kPre)) pill.appendChild(el('span',{class:'lockicon',title:'Manual lock'},'🔒'));
     line1.appendChild(pill);
@@ -1693,9 +1695,10 @@ function makePanel(mid, m){
             tt.style.background = techColors[it.tech] || '#777';
             const weeklyPostal = (it.postal_code || extractPostalCode(it.destination || '') || '').trim();
             const postalTxt = weeklyPostal ? ` | ${weeklyPostal}` : '';
-            const extraN = Array.isArray(it.additional_techs) ? it.additional_techs.length : 0;
+            const extraNames = Array.isArray(it.additional_techs) ? it.additional_techs : [];
+            const extraN = extraNames.length;
             const teamTxt = extraN ? ` | +${extraN} team` : '';
-            const txt=el('span',{class:'txt'}, `${it.site||''} | ${it.wo||''}${postalTxt}${teamTxt}`);
+            const txt=el('span',{class:'txt', title: extraN ? `Team: ${[it.tech].concat(extraNames).join(', ')}` : ''}, `${it.site||''} | ${it.wo||''}${postalTxt}${teamTxt}`);
             meta.appendChild(ptag); meta.appendChild(tt); meta.appendChild(txt);
             link.appendChild(meta);
             td.appendChild(link);
