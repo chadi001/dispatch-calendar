@@ -1254,7 +1254,7 @@ function inferAdminRegion(v){
   if(['montreal','montreal - est','anjou','dorval','lasalle','lachine','pierrefonds','pointe-claire','beaconsfield','kirkland','dollard-des-ormeaux','dollard-des-ormeaux','saint-laurent'].some(x=>n.includes(x))) return 'Montreal';
   if(['laval'].some(x=>n.includes(x))) return 'Laval';
   if(['longueuil','brossard','boucherville','saint-jean-sur-richelieu','chambly','carignan','beloeil','greenfield park','richelieu'].some(x=>n.includes(x))) return 'Monteregie';
-  if(['quebec city','quebec','beauport','charlesbourg','l`ancienne-lorette','l'ancienne-lorette','levis','pont-rouge','laurentier-station'].some(x=>n.includes(x))) return 'Capitale-Nationale';
+  if(['quebec city','quebec','beauport','charlesbourg','l`ancienne-lorette',"l'ancienne-lorette",'levis','pont-rouge','laurier-station'].some(x=>n.includes(x))) return 'Capitale-Nationale';
   if(['saguenay','chicoutimi','jonquiere','la baie','alma','dolbeau','metabetchouan','roberval'].some(x=>n.includes(x))) return 'Saguenay-Lac-Saint-Jean';
   if(['gatineau','ottawa','buckingham','papineauville'].some(x=>n.includes(x))) return 'Outaouais';
   if(['sherbrooke','magog','coaticook','granby'].some(x=>n.includes(x))) return 'Estrie';
@@ -1263,7 +1263,7 @@ function inferAdminRegion(v){
   if(['abitibi','rouyn-noranda','amos','la sarre'].some(x=>n.includes(x))) return 'Abitibi-Temiscamingue';
   if(['baie-comeau','forestville','havre-saint-pierre','gaspe','paspebiac'].some(x=>n.includes(x))) return 'Cote-Nord / Gaspesie';
   if(['laurentides','blainville','boisbriand','deux-montagnes','lachute','mirabel','mont-tremblant','piedmont','prevost','saint-jerome'].some(x=>n.includes(x))) return 'Laurentides';
-  if(['lanaudiere','joliette','mascouche','repentigny','lavaltrie','rawdon','l'epiphanie','l`epiphanie'].some(x=>n.includes(x))) return 'Lanaudiere';
+  if(['lanaudiere','joliette','mascouche','repentigny','lavaltrie','rawdon',"l'epiphanie",'l`epiphanie'].some(x=>n.includes(x))) return 'Lanaudiere';
   return s;
 }
 
