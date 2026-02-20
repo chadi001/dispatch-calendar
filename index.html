@@ -86,7 +86,11 @@ button.reset:hover{background:#f6f8ff;}
 .job .techtag{font-weight:900;font-size:12px;border-radius:999px;padding:2px 8px;color:#fff;}
 .job .txt{font-size:12px;color:#333;}
 
-.techchecks{display:flex;gap:10px;flex-wrap:wrap;max-width:520px}
+.techchecks{display:flex;gap:8px;flex-wrap:wrap;max-width:620px}
+.filterCard{border:1px solid #e5e7eb;border-radius:12px;padding:10px;background:#fff}
+.groupFilters{margin-top:6px;border:1px dashed #dbe2ea;border-radius:10px;padding:6px 8px;background:#f8fbff}
+.groupFilters summary{cursor:pointer;font-size:12px;font-weight:700;color:#374151}
+.groupFilters[open]{background:#f5faff}
 .tchk{display:flex;align-items:center;gap:6px;border:1px solid #eee;border-radius:999px;padding:6px 10px;background:#fff;cursor:pointer;user-select:none}
 .tchk input{accent-color:#1f4e79}
 .tchk .dot{width:10px;height:10px;border-radius:999px;display:inline-block}
@@ -166,6 +170,13 @@ button.reset:hover{background:#f6f8ff;}
 
 /* Quick order search */
 .order-search-quick{display:inline-flex;align-items:center;gap:8px;margin-left:8px}
+.authCard{border:1px solid #dbe2ea;border-radius:16px;background:linear-gradient(145deg,#ffffff,#f6fbff);padding:14px 16px;max-width:760px;display:flex;justify-content:space-between;gap:14px;align-items:center;margin:10px 0 14px 0}
+.authInfo{display:flex;flex-direction:column;gap:4px}
+.authTitle{font-size:14px;font-weight:800;color:#0f172a}
+.authMeta{font-size:12px;color:#475569}
+.authActions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.authInput{height:38px;border:1px solid #d1d5db;border-radius:10px;padding:0 10px;min-width:210px}
+@media (max-width:860px){.authCard{flex-direction:column;align-items:stretch}.authActions{justify-content:flex-start}}
 #orderSearchQuick{height:36px;min-width:220px;border:1px solid #e5e7eb;border-radius:10px;padding:0 12px;font-size:14px}
 #orderSearchQuick:focus{outline:none;border-color:#93c5fd;box-shadow:0 0 0 3px rgba(147,197,253,.35)}
 
@@ -346,7 +357,7 @@ button.reset:hover{background:#f6f8ff;}
     const host=document.getElementById('teamGroupsLegend');
     if(!host) return;
     const active=(TEAM_GROUPS||[]).filter(g=>g && g.active!==false);
-    if(!active.length){ host.textContent=''; return; }
+    if(!active.length){ host.textContent=''; if(groupChecks) groupChecks.innerHTML=''; return; }
     host.innerHTML = 'Groups (color via Manage groups): ' + active.map(function(g){
       const c = g.color || '#0ea5e9';
       const n = g.name || '';
@@ -734,24 +745,22 @@ function scheduleSaveOverridesToDB(){
 </span>
 </h2>
 
-   <div id="authBox" style="border:1px solid #ddd; padding:12px; border-radius:10px; max-width:420px; margin:10px 0;">
-  <div id="authStatus" style="margin-bottom:8px; color:#333;">Not signed in</div>
-
-  <div id="loginForm">
-    <input id="loginEmail" type="email" placeholder="Email" style="width:100%; padding:8px; margin:6px 0;" />
-    <input id="loginPass" type="password" placeholder="Password" style="width:100%; padding:8px; margin:6px 0;" />
-    <button id="btnLogin" type="button" style="padding:8px 12px; margin-top:6px;">Sign in</button>
-
-
+   <div id="authBox" class="authCard">
+  <div class="authInfo">
+    <div class="authTitle">Workspace Access</div>
+    <div id="authStatus" class="authMeta">Not signed in</div>
   </div>
 
-  <div id="logoutBox" style="display:none;">
-    <button id="btnLogout" style="padding:8px 12px;">Sign out</button>
+  <div id="loginForm" class="authActions">
+    <input id="loginEmail" class="authInput" type="email" placeholder="work email" />
+    <input id="loginPass" class="authInput" type="password" placeholder="password" />
+    <button id="btnLogin" type="button" class="reset">Sign in</button>
+  </div>
+
+  <div id="logoutBox" class="authActions" style="display:none;">
+    <button id="btnLogout" class="reset">Sign out</button>
   </div>
 </div>
-
-<div id="buildBadge" style="display:inline-block;padding:4px 8px;margin:6px 0 12px 0;border:1px solid #ddd;border-radius:8px;background:#f6f6f6;color:#333;font-size:12px;"></div>
-
 
 <p class="small">
 <b>This App is built for Aigle Info Inc. Activities</b><br/>
@@ -765,7 +774,7 @@ Tech priority: <b>Adil</b> → <b>Abdel</b>. Capacity: 1 AM + 1 PM per tech/day.
 <div id="appContent" style="display:none;">
   <div class="toolbar">
   
-  <div class="field">
+  <div class="field filterCard">
     <label>Tech</label>
     <div class="techchecks" id="techChecks"></div>
     <div class="techactions">
@@ -773,7 +782,10 @@ Tech priority: <b>Adil</b> → <b>Abdel</b>. Capacity: 1 AM + 1 PM per tech/day.
       <button class="qbtn" type="button" id="techClear">Clear</button>
     </div>
     <div id="teamGroupsLegend" class="small" style="margin-top:6px;color:#4b5563;"></div>
-    <div id="groupChecks" class="techchecks" style="margin-top:6px;"></div>
+    <details class="groupFilters" id="groupFiltersPanel">
+      <summary>Group filters</summary>
+      <div id="groupChecks" class="techchecks" style="margin-top:6px;"></div>
+    </details>
   </div>
 
   <div class="field">
@@ -786,7 +798,8 @@ Tech priority: <b>Adil</b> → <b>Abdel</b>. Capacity: 1 AM + 1 PM per tech/day.
     <label for="clientFilter">Client</label>
     <select id="clientFilter">
       <option value="ALL">All</option>
-      <option value="GOCO">GOCO</option>
+      <option value="GOCO">GOCO / COGO</option>
+      <option value="COGO">COGO</option>
       <option value="MCN">MCN</option>
     </select>
   </div>
@@ -1239,7 +1252,9 @@ function matchFilters(it, filters){
   if(filters.region!=="ALL" && it.region!==filters.region) return false;
   if((filters.client||'ALL') !== 'ALL'){
     const c = String(it.client||'').trim().toUpperCase();
-    if(c !== String(filters.client).trim().toUpperCase()) return false;
+    const want = String(filters.client).trim().toUpperCase();
+    const sameClient = (want==='GOCO' || want==='COGO') ? (c==='GOCO' || c==='COGO') : (c===want);
+    if(!sameClient) return false;
   }
   if(filters.groups && filters.groups.length>0){
     if(!it.teamJob || !it.groupName || !filters.groups.includes(it.groupName)) return false;
@@ -3515,7 +3530,7 @@ function clearAddJobForm(){
 function ensureMonthUI(monthId){
   if(document.getElementById('tab-'+monthId)) return;
   // Create tab + panel on the fly
-  applyManualJobsToPayload();
+  if(window.USE_DB_JOBS === false) applyManualJobsToPayload();
 const tabs=document.getElementById('tabs');
   const content=document.getElementById('content');
   const m=payload.months[monthId];
