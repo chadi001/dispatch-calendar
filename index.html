@@ -304,8 +304,9 @@ button.reset:hover{background:#f6f8ff;}
   function saveAreaRulesStore(){ try{ localStorage.setItem(featureKeys.areaRules, JSON.stringify(AREA_RULES||[])); }catch(e){} }
   function defaultTeamGroups(){
     return [
-      { name:'Group A', color:'#2563eb', active:true },
-      { name:'Group B', color:'#059669', active:true }
+      { name:'Delta', color:'#2563eb', active:true },
+      { name:'Falcon', color:'#059669', active:true },
+      { name:'Fox', color:'#dc2626', active:true }
     ];
   }
   function loadTeamGroupsStore(){
@@ -346,11 +347,12 @@ button.reset:hover{background:#f6f8ff;}
     if(!host) return;
     const active=(TEAM_GROUPS||[]).filter(g=>g && g.active!==false);
     if(!active.length){ host.textContent=''; return; }
-    host.innerHTML = 'Groups: ' + active.map(function(g){
+    host.innerHTML = 'Groups (color via Manage groups): ' + active.map(function(g){
       const c = g.color || '#0ea5e9';
       const n = g.name || '';
       return '<span style="display:inline-flex;align-items:center;gap:5px;margin-right:10px;"><span style="width:10px;height:10px;border-radius:999px;background:'+c+';display:inline-block;"></span>'+n+'</span>';
     }).join('');
+    renderGroupFilters();
   }
 
   function regionMatch(ruleRegion, jobRegion){
@@ -771,6 +773,7 @@ Tech priority: <b>Adil</b> → <b>Abdel</b>. Capacity: 1 AM + 1 PM per tech/day.
       <button class="qbtn" type="button" id="techClear">Clear</button>
     </div>
     <div id="teamGroupsLegend" class="small" style="margin-top:6px;color:#4b5563;"></div>
+    <div id="groupChecks" class="techchecks" style="margin-top:6px;"></div>
   </div>
 
   <div class="field">
@@ -1041,7 +1044,7 @@ Tech priority: <b>Adil</b> → <b>Abdel</b>. Capacity: 1 AM + 1 PM per tech/day.
     <div class="modal-body">
       <div id="groupsList"></div>
       <div style="margin-top:10px;padding-top:10px;border-top:1px solid #eee;display:grid;grid-template-columns:1fr 120px auto;gap:8px;align-items:end;">
-        <div class="edgrp"><div class="edlbl">Group name</div><input id="grpName" class="edsel" placeholder="Team East" /></div>
+        <div class="edgrp"><div class="edlbl">Group name</div><input id="grpName" class="edsel" placeholder="Delta / Falcon / Fox" /></div>
         <div class="edgrp"><div class="edlbl">Color</div><input id="grpColor" type="color" class="edsel" value="#2563eb"/></div>
         <button type="button" class="edbtn" id="btnAddGroup">Add group</button>
       </div>
@@ -1120,6 +1123,7 @@ const clientFilter=document.getElementById('clientFilter');
 const problemsOnly=document.getElementById('problemsOnly');
 const showCancelled=document.getElementById('showCancelled');
 const resetBtn=document.getElementById('resetBtn');
+const groupChecks=document.getElementById('groupChecks');
 
 function el(tag, attrs={}, text=null){
   const e=document.createElement(tag);
@@ -1176,13 +1180,30 @@ function populateFilters(){
 }
 
 function selectedTechs(){ return Array.from(document.querySelectorAll("#techChecks input[type=checkbox]:checked")).map(x=>x.value); }
+function selectedGroups(){ return Array.from(document.querySelectorAll("#groupChecks input[type=checkbox]:checked")).map(x=>x.value); }
+function renderGroupFilters(){
+  if(!groupChecks) return;
+  groupChecks.innerHTML='';
+  const active=(TEAM_GROUPS||[]).filter(g=>g && g.active!==false);
+  if(!active.length) return;
+  active.forEach(g=>{
+    const lbl = el('label',{class:'tchk'});
+    const cb = el('input',{type:'checkbox', value:String(g.name||'')});
+    const dot = el('span',{class:'dot'});
+    dot.style.background = g.color || '#0ea5e9';
+    lbl.appendChild(cb); lbl.appendChild(dot); lbl.appendChild(el('span',{}, String(g.name||'')));
+    groupChecks.appendChild(lbl);
+    cb.addEventListener('change', ()=>rerenderActive());
+  });
+}
 function currentFilters(){
   return {
     techs:selectedTechs(),
     region:regionFilter.value,
     client:(clientFilter?.value || 'ALL'),
     problemsOnly:problemsOnly.checked,
-    showCancelled:(document.getElementById('showCancelled')||{checked:false}).checked
+    showCancelled:(document.getElementById('showCancelled')||{checked:false}).checked,
+    groups:selectedGroups()
   };
 }
 function effectiveTechFor(it, iso){
@@ -1219,6 +1240,9 @@ function matchFilters(it, filters){
   if((filters.client||'ALL') !== 'ALL'){
     const c = String(it.client||'').trim().toUpperCase();
     if(c !== String(filters.client).trim().toUpperCase()) return false;
+  }
+  if(filters.groups && filters.groups.length>0){
+    if(!it.teamJob || !it.groupName || !filters.groups.includes(it.groupName)) return false;
   }
   if(filters.problemsOnly && !it.unassigned) return false;
   return true;
@@ -1905,7 +1929,7 @@ function renderKpis(){
   // Year-to-date total (all interventions, excluding cancelled)
   const yEl=document.getElementById('yearTotal');
   if(yEl){
-    const allFilters={techs:[], region:"ALL", client:"ALL", problemsOnly:false, showCancelled:false};
+    const allFilters={techs:[], region:"ALL", client:"ALL", groups:[], problemsOnly:false, showCancelled:false};
     const allItems=collectAllItems(allFilters);
     yEl.textContent = `Year total: ${allItems.length}`;
   }
@@ -3371,6 +3395,7 @@ applyFeatureUiState();
 
 // ---------------- Manual jobs (localStorage) ----------------
 const manualJobsKey = 'dispatch_manual_jobs_v1';
+let __addingJob = false;
 function loadManualJobs(){
   try{ return JSON.parse(localStorage.getItem(manualJobsKey)||'[]') || []; }catch(e){ return []; }
 }
@@ -3523,6 +3548,11 @@ const tabs=document.getElementById('tabs');
 }
 
 async function addJobFromModal(){
+  if(__addingJob) return;
+  __addingJob = true;
+  const saveBtn = document.getElementById('btnAddJobConfirm');
+  if(saveBtn){ saveBtn.disabled = true; saveBtn.textContent = 'Saving...'; }
+  try{
   const dateEl=document.getElementById('aj_date');
   const iso = (dateEl && dateEl.value) ? dateEl.value.trim() : '';
   if(!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)){
@@ -3597,9 +3627,18 @@ async function addJobFromModal(){
     };
     const saved = await dbUpsertJob(dbPayload);
     if(saved){
-      const dbItem = jobRowToPayloadItem(saved);
-      addJobToPayload(iso, dbItem);
       addedFromDb = true;
+      try{
+        const list = loadManualJobs().filter(rec => {
+          if(!rec || rec.iso !== iso || !rec.job) return true;
+          const sameWo = String(rec.job.wo||'').trim() && String(rec.job.wo||'').trim()===String(job.wo||'').trim();
+          const sameSite = String(rec.job.site||'').trim()===String(job.site||'').trim();
+          const sameTech = String(rec.job.tech||'').trim()===String(job.tech||'').trim();
+          return !(sameWo || (sameSite && sameTech));
+        });
+        saveManualJobs(list);
+      }catch(e){}
+      await dbBootstrapJobsIntoPayload();
     }
   }
 
@@ -3625,6 +3664,10 @@ async function addJobFromModal(){
   }else{
     closeAddJob();
     clearAddJobForm();
+  }
+  } finally {
+    __addingJob = false;
+    if(saveBtn){ saveBtn.disabled = false; saveBtn.textContent = 'Add'; }
   }
 }
 
@@ -4052,6 +4095,7 @@ resetBtn.onclick=()=>{
   if(clientFilter) clientFilter.value='ALL';
   problemsOnly.checked=false;
   if(showCancelled) showCancelled.checked=false;
+  document.querySelectorAll('#groupChecks input[type=checkbox]').forEach(cb=>cb.checked=false);
   rerenderActive();
 };
 }
