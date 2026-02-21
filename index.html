@@ -1993,7 +1993,21 @@ function activate(mid){ rebuildMonthsFromOverrides();
   renderKpis();
 }
 function rerenderActive(){ rebuildMonthsFromOverrides(); const active=document.querySelector('.panel.active'); if(active && active._rerender) active._rerender(); renderKpis(); highlightMonthsWithFilteredJobs(); }
+function hasActiveFilters(){
+  const f = currentFilters();
+  if(f.techs.length > 0) return true;
+  if(f.region !== 'ALL') return true;
+  if(f.client !== 'ALL') return true;
+  if(f.problemsOnly) return true;
+  if(f.showCancelled) return true;
+  if(f.groups.length > 0) return true;
+  return false;
+}
 function highlightMonthsWithFilteredJobs(){
+  if(!hasActiveFilters()){
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('hasJobs'));
+    return;
+  }
   const filters = currentFilters();
   document.querySelectorAll('.tab').forEach(tab=>{
     const mid = tab.id?.replace('tab-','');
