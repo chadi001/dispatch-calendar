@@ -45,6 +45,7 @@ button.reset:hover{background:#f6f8ff;}
 .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 14px 0;}
 .tab{border:1px solid #ddd;border-radius:10px;padding:8px 10px;cursor:pointer;background:#fff;}
 .tab.active{background:#f3f6ff;border-color:#b6c6ff;}
+.tab.hasJobs{background:#fef9c3;border-color:#facc15;}
 .panel{display:none;}
 .panel.active{display:block;}
 .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;max-width:980px;}
@@ -364,13 +365,7 @@ button.reset:hover{background:#f6f8ff;}
   function renderTeamGroupsLegend(){
     const host=document.getElementById('teamGroupsLegend');
     if(!host) return;
-    const active=(TEAM_GROUPS||[]).filter(g=>g && g.active!==false);
-    if(!active.length){ host.textContent=''; if(groupChecks) groupChecks.innerHTML=''; return; }
-    host.innerHTML = 'Groups (color via Manage groups): ' + active.map(function(g){
-      const c = g.color || '#0ea5e9';
-      const n = g.name || '';
-      return '<span style="display:inline-flex;align-items:center;gap:5px;margin-right:10px;"><span style="width:10px;height:10px;border-radius:999px;background:'+c+';display:inline-block;"></span>'+n+'</span>';
-    }).join('');
+    host.textContent = '';
     renderGroupFilters();
   }
 
@@ -806,10 +801,17 @@ function scheduleSaveOverridesToDB(){
     </div>
 
     <div class="toolbarSide">
-      <div class="field filterCard">
+        <div class="field filterCard">
         <label for="regionFilter">Administrative Region</label>
         <select id="regionFilter">
           <option value="ALL">All</option>
+        </select>
+        <label for="clientFilterSide" style="margin-top:8px">Client</label>
+        <select id="clientFilterSide">
+          <option value="ALL">All</option>
+          <option value="GOCO">GOCO / COGO</option>
+          <option value="COGO">COGO</option>
+          <option value="MCN">MCN</option>
         </select>
         <details class="techFilters" id="techFiltersPanel" open>
           <summary>Tech filters</summary>
@@ -1168,6 +1170,7 @@ const tabs=document.getElementById('tabs');
 const content=document.getElementById('content');
 const regionFilter=document.getElementById('regionFilter');
 const clientFilter=document.getElementById('clientFilter');
+const clientFilterSide=document.getElementById('clientFilterSide');
 const problemsOnly=document.getElementById('problemsOnly');
 const showCancelled=document.getElementById('showCancelled');
 const resetBtn=document.getElementById('resetBtn');
@@ -1280,10 +1283,11 @@ function collectAdministrativeRegions(){
 }
 
 function currentFilters(){
+  const clientVal = (clientFilter?.value || clientFilterSide?.value || 'ALL');
   return {
     techs:selectedTechs(),
     region:regionFilter.value,
-    client:(clientFilter?.value || 'ALL'),
+    client:clientVal,
     problemsOnly:problemsOnly.checked,
     showCancelled:(document.getElementById('showCancelled')||{checked:false}).checked,
     groups:selectedGroups()
@@ -1988,7 +1992,29 @@ function activate(mid){ rebuildMonthsFromOverrides();
   if(panelEl && panelEl._rerender) panelEl._rerender();
   renderKpis();
 }
-function rerenderActive(){ rebuildMonthsFromOverrides(); const active=document.querySelector('.panel.active'); if(active && active._rerender) active._rerender(); renderKpis(); }
+function rerenderActive(){ rebuildMonthsFromOverrides(); const active=document.querySelector('.panel.active'); if(active && active._rerender) active._rerender(); renderKpis(); highlightMonthsWithFilteredJobs(); }
+function highlightMonthsWithFilteredJobs(){
+  const filters = currentFilters();
+  document.querySelectorAll('.tab').forEach(tab=>{
+    const mid = tab.id?.replace('tab-','');
+    if(!mid) return;
+    const m = payload.months[mid];
+    if(!m) return;
+    let hasFiltered = false;
+    for(const iso of Object.keys(m.date_index||{})){
+      for(const it of (m.date_index[iso]||[])){
+        const n = normalizeDisplayItem(it, iso);
+        if(matchFilters(n, filters)){ hasFiltered = true; break; }
+      }
+      if(hasFiltered) break;
+    }
+    if(hasFiltered){
+      tab.classList.add('hasJobs');
+    }else{
+      tab.classList.remove('hasJobs');
+    }
+  });
+}
 
 
 // ---------------- KPIs + Google My Maps export (active month, filtered) ----------------
@@ -4232,12 +4258,14 @@ function rebuildMonthsFromOverrides(){
 function wireHandlers(){
 regionFilter.onchange=rerenderActive;
 if(clientFilter) clientFilter.onchange=rerenderActive;
+if(clientFilterSide) clientFilterSide.onchange=rerenderActive;
 problemsOnly.onchange=rerenderActive;
 showCancelled.onchange=rerenderActive;
 resetBtn.onclick=()=>{
   document.querySelectorAll("#techChecks input[type=checkbox]").forEach(cb=>cb.checked=false);
   regionFilter.value='ALL';
   if(clientFilter) clientFilter.value='ALL';
+  if(clientFilterSide) clientFilterSide.value='ALL';
   problemsOnly.checked=false;
   if(showCancelled) showCancelled.checked=false;
   document.querySelectorAll('#groupChecks input[type=checkbox]').forEach(cb=>cb.checked=false);
@@ -4265,6 +4293,7 @@ function buildUIFromPayload(){
   activate(Object.keys(payload.months)[0]);
   renderKpis();
   wireHandlers();
+  highlightMonthsWithFilteredJobs();
   if(window.IS_ADMIN) setSyncStatus('Idle', 'neutral');
 }
   
