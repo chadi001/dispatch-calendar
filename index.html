@@ -1132,7 +1132,7 @@ function normalizeTechName(t){
   // legacy compatibility
   if(s==='Tech A') return 'Adil';
   if(s==='Tech B') return 'Abdel';
-  return s;
+  return "";
 }
 function ensureTechColors(){
   if(!payload.tech_colors) payload.tech_colors = {};
@@ -1262,7 +1262,7 @@ function inferAdminRegion(v){
   if(['baie-comeau','forestville','havre-saint-pierre','gaspe','paspebiac'].some(x=>n.includes(x))) return 'Cote-Nord / Gaspesie';
   if(['laurentides','blainville','boisbriand','deux-montagnes','lachute','mirabel','mont-tremblant','piedmont','prevost','saint-jerome'].some(x=>n.includes(x))) return 'Laurentides';
   if(['lanaudiere','joliette','mascouche','repentigny','lavaltrie','rawdon',"l'epiphanie",'l`epiphanie'].some(x=>n.includes(x))) return 'Lanaudiere';
-  return s;
+  return "";
 }
 
 function collectAdministrativeRegions(){
@@ -1369,11 +1369,13 @@ function dailyRoute(items){
 function clearSelected(panel){
   panel.querySelectorAll('.celllink.selected').forEach(c=>c.classList.remove('selected'));
 }
+let __drawerCollapsed = false;
+
 function buildDrawer(){
   const d=el('div',{class:'drawer'});
   d.innerHTML=`
     <div class="drawerhead">
-      <div class="title" id="drawerTitle">Day details</div>
+      <div class="title" id="drawerTitle" style="cursor:pointer" title="Click to hide/show details">Day details</div>
       <button class="close" id="drawerClose">Close</button>
     </div>
     <div class="list" id="drawerList"></div>
@@ -1383,8 +1385,15 @@ function buildDrawer(){
 function openDrawer(drawer, title, items, iso){
   drawer.classList.add('active');
   drawer.dataset.iso = iso || '';
-  drawer.querySelector('#drawerTitle').textContent=title;
+  const titleEl = drawer.querySelector('#drawerTitle');
   const list=drawer.querySelector('#drawerList');
+  titleEl.textContent = (__drawerCollapsed ? '[+] ' : '[-] ') + title;
+  titleEl.onclick = ()=>{
+    __drawerCollapsed = !__drawerCollapsed;
+    titleEl.textContent = (__drawerCollapsed ? '[+] ' : '[-] ') + title;
+    list.style.display = __drawerCollapsed ? 'none' : 'flex';
+  };
+  list.style.display = __drawerCollapsed ? 'none' : 'flex';
   list.innerHTML='';
   if(!items.length){
     list.appendChild(el('div',{class:'small'},'No jobs for current filters on this day.'));
@@ -1940,14 +1949,17 @@ function makePanel(mid, m){
             const ptag=el('span',{class: it.plage==='PM'?'pmtag':'amtag'}, it.plage);
             const tt=el('span',{class:'techtag'}, it.tech);
             tt.style.background = techColors[it.tech] || '#777';
+            const c = (it.client||'').trim().toUpperCase();
+            const ct = el('span',{class:'clientTag ' + (c==='GOCO' || c==='COGO' ? 'goco' : (c==='MCN' ? 'mcn' : 'unk'))}, c || '—');
             const weeklyPostal = (it.postal_code || extractPostalCode(it.destination || '') || '').trim();
-            const postalTxt = weeklyPostal ? ` | ${weeklyPostal}` : '';
+            const idTxt = (it.wo && String(it.wo).trim()) ? `WO ${String(it.wo).trim()}` : ((it.site && String(it.site).trim()) ? `Site ${String(it.site).trim()}` : '');
             const extraNames = Array.isArray(it.additional_techs) ? it.additional_techs : [];
             const extraN = extraNames.length;
             const teamTxt = extraN ? ` | +${extraN} team` : '';
             const grpTxt = (it.teamJob && it.groupName) ? ` | [${it.groupName}]` : '';
-            const txt=el('span',{class:'txt', title: extraN ? `Team: ${[it.tech].concat(extraNames).join(', ')}` : ''}, `${it.site||''} | ${it.wo||''}${postalTxt}${teamTxt}${grpTxt}`);
-            meta.appendChild(ptag); meta.appendChild(tt); meta.appendChild(txt);
+            const detail = [weeklyPostal, idTxt].filter(Boolean).join(' | ');
+            const txt=el('span',{class:'txt', title: extraN ? `Team: ${[it.tech].concat(extraNames).join(', ')}` : ''}, `${detail}${teamTxt}${grpTxt}`);
+            meta.appendChild(ptag); meta.appendChild(tt); meta.appendChild(ct); meta.appendChild(txt);
             link.appendChild(meta);
             td.appendChild(link);
           }
