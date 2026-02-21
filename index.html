@@ -782,12 +782,6 @@ function scheduleSaveOverridesToDB(){
   <div class="toolbar">
     <div class="toolbarMain">
       <div class="field">
-        <label for="regionFilter">Administrative Region</label>
-        <select id="regionFilter">
-          <option value="ALL">All</option>
-        </select>
-      </div>
-      <div class="field">
         <label for="clientFilter">Client</label>
         <select id="clientFilter">
           <option value="ALL">All</option>
@@ -813,6 +807,10 @@ function scheduleSaveOverridesToDB(){
 
     <div class="toolbarSide">
       <div class="field filterCard">
+        <label for="regionFilter">Administrative Region</label>
+        <select id="regionFilter">
+          <option value="ALL">All</option>
+        </select>
         <details class="techFilters" id="techFiltersPanel" open>
           <summary>Tech filters</summary>
           <div class="techchecks" id="techChecks" style="margin-top:6px;"></div>
