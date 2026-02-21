@@ -1282,8 +1282,15 @@ function collectAdministrativeRegions(){
   return Array.from(set).sort((a,b)=>a.localeCompare(b));
 }
 
+function getClientFilterValue(){
+  const topVal = String(clientFilter?.value || 'ALL');
+  const sideVal = String(clientFilterSide?.value || 'ALL');
+  if(sideVal !== 'ALL') return sideVal;
+  if(topVal !== 'ALL') return topVal;
+  return 'ALL';
+}
 function currentFilters(){
-  const clientVal = (clientFilter?.value || clientFilterSide?.value || 'ALL');
+  const clientVal = getClientFilterValue();
   return {
     techs:selectedTechs(),
     region:regionFilter.value,
@@ -4271,8 +4278,21 @@ function rebuildMonthsFromOverrides(){
 // Build UI (DB-aware bootstrap)
 function wireHandlers(){
 regionFilter.onchange=rerenderActive;
-if(clientFilter) clientFilter.onchange=rerenderActive;
-if(clientFilterSide) clientFilterSide.onchange=rerenderActive;
+if(clientFilter){
+  clientFilter.onchange=function(){
+    if(clientFilterSide) clientFilterSide.value = clientFilter.value;
+    rerenderActive();
+  };
+}
+if(clientFilterSide){
+  clientFilterSide.onchange=function(){
+    if(clientFilter) clientFilter.value = clientFilterSide.value;
+    rerenderActive();
+  };
+}
+if(clientFilter && clientFilterSide){
+  clientFilterSide.value = clientFilter.value;
+}
 problemsOnly.onchange=rerenderActive;
 showCancelled.onchange=rerenderActive;
 resetBtn.onclick=()=>{
