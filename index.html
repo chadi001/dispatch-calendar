@@ -914,6 +914,7 @@ function scheduleSaveOverridesToDB(){
           <button class="reset" id="btnManageGroups" type="button">Manage groups</button>
           <button class="reset" id="btnHelpGuide" type="button">Help / Tutorial</button>
           <button class="reset" id="btnOnsiteInstall" type="button">Onsite install page</button>
+          <button class="reset" id="btnAutoOpenOnsite" type="button">Auto-open onsite: OFF</button>
           <button class="reset" id="btnExportJobsCsv" type="button">Export jobs CSV</button>
           <button class="reset" id="btnExportManagerCsv" type="button">Export manager report CSV</button>
           <button class="reset" id="btnExportManagerSummaryCsv" type="button">Export manager summary CSV</button>
@@ -1318,6 +1319,15 @@ const groupChecks=document.getElementById('groupChecks');
 const analyticsRange=document.getElementById('analyticsRange');
 const analyticsFrom=document.getElementById('analyticsFrom');
 const analyticsTo=document.getElementById('analyticsTo');
+const AUTO_OPEN_ONSITE_KEY='dispatch_auto_open_onsite_v1';
+function getAutoOpenOnsite(){
+  try{ return localStorage.getItem(AUTO_OPEN_ONSITE_KEY)==='1'; }catch(e){ return false; }
+}
+function setAutoOpenOnsite(v){
+  try{ localStorage.setItem(AUTO_OPEN_ONSITE_KEY, v ? '1' : '0'); }catch(e){}
+  const b=document.getElementById('btnAutoOpenOnsite');
+  if(b) b.textContent = `Auto-open onsite: ${v ? 'ON' : 'OFF'}`;
+}
 
 function el(tag, attrs={}, text=null){
   const e=document.createElement(tag);
@@ -1769,6 +1779,9 @@ function openDrawer(drawer, title, items, iso){
     btnStart.onclick = async ()=>{
       const r = await runJobActionRpc('tech_start_job', { p_job_id: dbId, p_note: null });
       if(!r.ok){ alert('Start failed: ' + r.error); return; }
+      if(getAutoOpenOnsite() && dbId){
+        try{ window.open(`onsite-install.html?job_id=${encodeURIComponent(dbId)}`,'_blank'); }catch(e){}
+      }
       await refreshAfterExecution();
     };
     actionsS.appendChild(btnStart);
@@ -2844,7 +2857,7 @@ function exportManagerReportCsv(){
   const out=[["Planned Date","Actual Start","Actual End","Status","Client","Tech","Additional Techs","Region","Site","Work Order","Address","Cancel Reason","Cancel Note","Delay Days","Overdue"]];
   const today = dateOnlyIso(new Date().toISOString());
   for(const it of rows){
-    const st = String(it.status || (it._cancelled?'cancelled':'scheduled')).toLowerCase();
+    const st = String(it.status || (it._cancelled ? 'cancelled' : 'scheduled')).toLowerCase();
     let delay = '';
     if(st==='completed' && it.iso && it.actual_end_at){
       const dPlan = new Date(`${it.iso}T00:00:00`);
@@ -2875,7 +2888,6 @@ function exportManagerReportCsv(){
   downloadText(`manager_report_${payload.year}_${tag}.csv`, csv, 'text/csv;charset=utf-8');
 }
 
-
 function exportManagerSummaryCsv(){
   rebuildMonthsFromOverrides();
   const range = getAnalyticsRangeBounds();
@@ -2886,12 +2898,13 @@ function exportManagerSummaryCsv(){
   const statusCounts = { scheduled:0, in_progress:0, completed:0, cancelled:0, on_hold:0 };
   const cancelReasons = {};
   const completionByTech = {};
-  let delayTotal = 0, delayN = 0;
+  let delayTotal = 0;
+  let delayN = 0;
   let overdue = 0;
   const today = dateOnlyIso(new Date().toISOString());
 
   for(const it of rows){
-    const st = String(it.status || (it._cancelled?'cancelled':'scheduled')).toLowerCase();
+    const st = String(it.status || (it._cancelled ? 'cancelled' : 'scheduled')).toLowerCase();
     if(statusCounts[st]===undefined) statusCounts[st]=0;
     statusCounts[st]++;
 
@@ -2947,8 +2960,7 @@ function exportManagerSummaryCsv(){
     out.push(['Completion by tech', tech, `${pct}% (${v.completed}/${v.total})`]);
   }
 
-  const csv = out.map(r=>r.map(csvEscape).join(',')).join('
-');
+  const csv = out.map(r=>r.map(csvEscape).join(',')).join('\n');
   const tag = (range.mode||'all');
   downloadText(`manager_summary_${payload.year}_${tag}.csv`, csv, 'text/csv;charset=utf-8');
 }
@@ -4365,6 +4377,8 @@ document.getElementById('btnCloseHelpGuide')?.addEventListener('click', closeHel
 document.getElementById('btnCloseHelpGuide2')?.addEventListener('click', closeHelpGuide);
 document.getElementById('helpGuideBackdrop')?.addEventListener('click', closeHelpGuide);
 document.getElementById('btnOnsiteInstall')?.addEventListener('click', ()=>window.open('onsite-install.html','_blank'));
+document.getElementById('btnAutoOpenOnsite')?.addEventListener('click', ()=>setAutoOpenOnsite(!getAutoOpenOnsite()));
+setAutoOpenOnsite(getAutoOpenOnsite());
 
 applyFeatureUiState();
 
@@ -5149,7 +5163,7 @@ function setEditModeUI(){
     "btnExportOverridesJson", "btnImportOverridesJson",
     "btnExportJobsCsv", "btnExportManagerCsv", "btnExportManagerSummaryCsv", "btnImportJobsCsv",
     "btnExportAllJson", "btnImportAllJson",
-    "btnAddJob", "btnManageTechs", "btnToggleMultiTech", "btnToggleAreaRules", "btnManageAreaRules", "btnManageGroups", "syncStatus",
+    "btnAddJob", "btnManageTechs", "btnToggleMultiTech", "btnToggleAreaRules", "btnManageAreaRules", "btnManageGroups", "btnAutoOpenOnsite", "syncStatus",
     "btnPlanGenerate", "btnPlanOptimize", "btnPlanCompare", "btnPlanApply", "btnSyncToDb", "btnPlanReset", "resetBatchSelect", "btnRefreshBatches", "btnPlanExport",
 
     // file inputs for imports
