@@ -405,11 +405,13 @@ button.reset:hover{background:#f6f8ff;}
   async function dbValidateRuntimeSchema(){
     if(!window.sb) return { ok:false, missing:['supabase_client'] };
     const checks = [
-      { table:'jobs', cols:'id,job_date,tech_name,slot,plage,wo,order_number,site,prov_site,city,address,client,cancelled,manual_lock' },
+      { table:'jobs', cols:'id,job_date,tech_name,slot,plage,wo,order_number,site,prov_site,city,address,client,cancelled,manual_lock,status,cancel_reason_code,cancel_reason_note,actual_start_at,actual_end_at' },
       { table:'admin_users', cols:'user_id' },
-      { table:'tech_profiles', cols:'user_id,display_name,tech_code,is_active' },
+      { table:'tech_profiles', cols:'user_id,display_name,tech_code,is_active,priority_rank,specialties' },
       { table:'tech_name_map', cols:'user_id,tech_name,is_active' },
-      { table:'dispatch_override_packs', cols:'year,tech_overrides,plage_overrides,date_overrides,cancel_overrides,manual_locks' }
+      { table:'dispatch_override_packs', cols:'year,tech_overrides,plage_overrides,date_overrides,cancel_overrides,manual_locks' },
+      { table:'job_work_sessions', cols:'id,job_id,tech_name,started_at,ended_at' },
+      { table:'job_checklist_items', cols:'id,job_id,title,is_required,completed' }
     ];
     const missing = [];
     for(const c of checks){
@@ -426,6 +428,28 @@ button.reset:hover{background:#f6f8ff;}
     return out;
   }
 
+
+  window.CURRENT_TECH_NAME = window.CURRENT_TECH_NAME || '';
+
+  async function dbResolveCurrentTechName(user){
+    if(!window.sb) return '';
+    try{
+      const { data: techName, error: fnErr } = await window.sb.rpc('current_tech_name');
+      if(!fnErr && typeof techName === 'string' && String(techName).trim()) return String(techName).trim();
+    }catch(e){}
+    try{
+      const uid = user?.id || (await window.sb.auth.getUser())?.data?.user?.id;
+      if(!uid) return '';
+      const { data: mapRow, error: mapErr } = await window.sb
+        .from('tech_name_map')
+        .select('tech_name')
+        .eq('user_id', uid)
+        .eq('is_active', true)
+        .maybeSingle();
+      if(!mapErr && mapRow?.tech_name) return String(mapRow.tech_name).trim();
+    }catch(e){}
+    return '';
+  }
 
   async function dbLoadJobs() {
   const { data: { user }, error: userErr } = await window.sb.auth.getUser();
@@ -456,27 +480,8 @@ button.reset:hover{background:#f6f8ff;}
   }
 
   // 2) Tech users: RLS first + local safeguard filter by mapped tech
-  let myTech = null;
-  try{
-    const { data: techName, error: fnErr } = await window.sb.rpc('current_tech_name');
-    if(!fnErr && typeof techName === 'string') myTech = techName;
-  }catch(e){
-    console.warn('[dbLoadJobs] current_tech_name rpc unavailable:', e);
-  }
-
-  if(!myTech){
-    try{
-      const { data: mapRow, error: mapErr } = await window.sb
-        .from('tech_name_map')
-        .select('tech_name')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .maybeSingle();
-      if(!mapErr && mapRow?.tech_name) myTech = mapRow.tech_name;
-    }catch(e){
-      console.warn('[dbLoadJobs] tech_name_map fallback err:', e);
-    }
-  }
+  const myTech = await dbResolveCurrentTechName(user);
+  window.CURRENT_TECH_NAME = myTech || '';
 
   const { data, error } = await window.sb
     .from("jobs")
@@ -633,6 +638,11 @@ function jobRowToPayloadItem(r){
     job_desc: r.job_desc || '',
     additional_techs: (__jobAssignmentsMap && __jobAssignmentsMap[r.id]) ? (__jobAssignmentsMap[r.id].slice()) : [],
     cancelled: !!r.cancelled,
+    status: String(r.status || (r.cancelled ? 'cancelled' : 'scheduled')).toLowerCase(),
+    cancel_reason_code: r.cancel_reason_code || '',
+    cancel_reason_note: r.cancel_reason_note || '',
+    actual_start_at: r.actual_start_at || '',
+    actual_end_at: r.actual_end_at || '',
     _db_id: r.id
   };
 }
@@ -1011,7 +1021,7 @@ function scheduleSaveOverridesToDB(){
     <div class="modal-header">
       <div>
         <div class="modal-title">Manage Team</div>
-        <div class="modal-subtitle">Map authenticated users to tech names.</div>
+        <div class="modal-subtitle">Map authenticated users to tech names, priorities, and client specialties.</div>
       </div>
       <button type="button" class="reset" id="btnCloseManageTechs">Close</button>
     </div>
@@ -1130,6 +1140,91 @@ const techColors = payload.tech_colors;
 const TECHS = ["Adil","Abdel","Chadi","Tech A","Tech B","UNASSIGNED"];
 // Auto-fill priority (today we optimize only for Adil then Abdel)
 const AUTO_PRIORITY = ["Adil","Abdel","Chadi","Tech A","Tech B"];
+let TECH_PROFILE_RULES = {};
+
+function normalizeClientCode(client){
+  const c = String(client||'').trim().toUpperCase();
+  if(!c) return '';
+  if(c==='COGO') return 'GOCO';
+  return c;
+}
+
+function parseSpecialtiesInput(raw){
+  const txt = String(raw||'').trim();
+  if(!txt) return ['ALL'];
+  const parts = txt.split(',').map(x=>normalizeClientCode(x)).filter(Boolean);
+  const uniq = Array.from(new Set(parts));
+  return uniq.length ? uniq : ['ALL'];
+}
+
+function specialtiesToText(arr){
+  if(!Array.isArray(arr) || !arr.length) return 'ALL';
+  return arr.map(x=>normalizeClientCode(x)).filter(Boolean).join(', ');
+}
+
+function canTechHandleClient(tech, client){
+  const t = String(tech||'').trim();
+  if(!t || t==='UNASSIGNED') return true;
+  const want = normalizeClientCode(client);
+  if(!want) return true;
+  const prof = TECH_PROFILE_RULES[t];
+  if(!prof || !Array.isArray(prof.specialties) || !prof.specialties.length) return true;
+  const specs = prof.specialties.map(normalizeClientCode);
+  if(specs.includes('ALL')) return true;
+  return specs.includes(want);
+}
+
+function getPriorityTechList(iso, unavailable, client){
+  const monthBase = (monthNum(iso)===4) ? plannerSettings.aprilPriority.slice() : plannerSettings.defaultPriority.slice();
+  const seen = new Set();
+  const base = [];
+  for(const t of monthBase.concat(AUTO_PRIORITY)){
+    const name = String(t||'').trim();
+    if(!name || name==='UNASSIGNED' || seen.has(name)) continue;
+    seen.add(name);
+    base.push(name);
+  }
+  const idx = Object.fromEntries(base.map((t,i)=>[t,i]));
+  return base
+    .filter(t => !isTechUnavailable(t, iso, unavailable||[]))
+    .filter(t => canTechHandleClient(t, client))
+    .sort((a,b)=>{
+      const ra = Number(TECH_PROFILE_RULES[a]?.priority_rank ?? 100);
+      const rb = Number(TECH_PROFILE_RULES[b]?.priority_rank ?? 100);
+      if(ra!==rb) return ra-rb;
+      return (idx[a]??999) - (idx[b]??999);
+    });
+}
+
+async function refreshTechProfileRules(){
+  if(!window.sb){ TECH_PROFILE_RULES = {}; return; }
+  try{
+    const { data, error } = await window.sb
+      .from('tech_profiles')
+      .select('display_name,is_active,priority_rank,specialties')
+      .eq('is_active', true);
+    if(error){
+      console.warn('[refreshTechProfileRules] error:', error);
+      TECH_PROFILE_RULES = {};
+      return;
+    }
+    const map = {};
+    for(const r of (data||[])){
+      const name = String(r.display_name||'').trim();
+      if(!name) continue;
+      map[name] = {
+        priority_rank: Number(r.priority_rank ?? 100),
+        specialties: Array.isArray(r.specialties) && r.specialties.length
+          ? Array.from(new Set(r.specialties.map(normalizeClientCode).filter(Boolean)))
+          : ['ALL']
+      };
+    }
+    TECH_PROFILE_RULES = map;
+  }catch(e){
+    console.warn('[refreshTechProfileRules] exception:', e);
+    TECH_PROFILE_RULES = {};
+  }
+}
 
 function normalizeTechName(t){
   const s=(t||'').trim();
@@ -1320,6 +1415,7 @@ function normalizeDisplayItem(it, iso){
   const dbId = String(it._db_id || it.id || '').trim();
   const g = getJobGroupById(dbId);
   const adminRegion = inferAdminRegion(it.region || (it.raw&&it.raw.city) || '');
+  const status = String(it.status || '').trim().toLowerCase() || (((!!it.cancelled) || !!cancelOverrides[k]) ? 'cancelled' : 'scheduled');
   return {
     ...it,
     tech,
@@ -1329,7 +1425,8 @@ function normalizeDisplayItem(it, iso){
     groupName: g ? g.name : '',
     groupColor: g ? g.color : '',
     unassigned: isUnassignedTech(tech) && !teamJob,
-    _cancelled: (!!it.cancelled) || !!cancelOverrides[k]
+    status,
+    _cancelled: status === 'cancelled' || (!!it.cancelled) || !!cancelOverrides[k]
   };
 }
 function matchFilters(it, filters){
@@ -1348,6 +1445,41 @@ function matchFilters(it, filters){
   if(filters.problemsOnly && !it.unassigned) return false;
   return true;
 }
+
+function canExecuteJobItem(it){
+  if(window.IS_ADMIN) return true;
+  const me = String(window.CURRENT_TECH_NAME || '').trim().toLowerCase();
+  if(!me) return false;
+  if(String(it.tech||'').trim().toLowerCase() === me) return true;
+  const extra = Array.isArray(it.additional_techs) ? it.additional_techs : [];
+  return extra.some(t => String(t||'').trim().toLowerCase() === me);
+}
+
+function fmtDateTime(v){
+  if(!v) return '';
+  try{ return new Date(v).toLocaleString(); }catch(e){ return String(v); }
+}
+
+async function runJobActionRpc(fn, payload){
+  if(!window.sb) return { ok:false, error:'No DB client' };
+  try{
+    const { error } = await window.sb.rpc(fn, payload || {});
+    if(error) return { ok:false, error:error.message || String(error) };
+    return { ok:true };
+  }catch(e){
+    return { ok:false, error:e?.message || String(e) };
+  }
+}
+
+function statusChipText(status){
+  const s = String(status||'scheduled').toLowerCase();
+  if(s==='in_progress') return 'IN PROGRESS';
+  if(s==='completed') return 'COMPLETED';
+  if(s==='cancelled') return 'CANCELLED';
+  if(s==='on_hold') return 'ON HOLD';
+  return 'SCHEDULED';
+}
+
 function plageSort(p){ return p==="AM"?0:(p==="PM"?1:2); }
 function extractPostalCode(text){
   const s = String(text||'');
@@ -1453,6 +1585,15 @@ function openDrawer(drawer, title, items, iso){
     if(isCancelled){ line1.appendChild(el('span',{class:'cancelPill'},'CANCELLED')); }
     meta.appendChild(line1);
     meta.appendChild(el('div',{class:'dest'},it.destination||''));
+    const statusLine = el('div',{class:'small'}, `Status: ${statusChipText(it.status)}${it.actual_start_at ? ' | Start: '+fmtDateTime(it.actual_start_at) : ''}${it.actual_end_at ? ' | End: '+fmtDateTime(it.actual_end_at) : ''}`);
+    meta.appendChild(statusLine);
+    if(it.cancel_reason_code){
+      meta.appendChild(el('div',{class:'small'}, `Cancel reason: ${it.cancel_reason_code}${it.cancel_reason_note ? ' - '+it.cancel_reason_note : ''}`));
+    }
+
+    const checklistBox = el('div',{class:'small'});
+    checklistBox.textContent = 'Checklist: loading...';
+    meta.appendChild(checklistBox);
 
     const controls = document.createElement('div');
     controls.className='edit';
@@ -1497,61 +1638,73 @@ function openDrawer(drawer, title, items, iso){
     grp2.appendChild(plageSel);
     controls.appendChild(grp2);
 
-    // Status group (kept immediate)
+    // Status group (execution controls)
     const grpS = document.createElement('div');
     grpS.className='edgrp';
     const lblS = document.createElement('div');
     lblS.className='edlbl';
-    lblS.textContent='Status';
+    lblS.textContent='Execution';
     const actionsS = document.createElement('div');
     actionsS.className='edactions';
-    const btnCancel = document.createElement('button');
 
+    const statusNow = String(it.status || (isCancelled ? 'cancelled' : 'scheduled')).toLowerCase();
+    const canExec = canExecuteJobItem(it);
+    const dbId = String(it._db_id || it.id || '').trim();
 
-    
-    btnCancel.type='button';
-    btnCancel.className='edbtn ' + (isCancelled ? 'secondary' : '');
-    btnCancel.textContent = isCancelled ? 'Restore' : 'Cancel';
-    btnCancel.onclick = async ()=>{
-      if(!window.CAN_EDIT){
-        alert("Admin only");
+    const renderChecklist = async ()=>{
+      if(!dbId || !window.sb){
+        checklistBox.textContent = 'Checklist: unavailable';
         return;
       }
-
-      const msg = isCancelled
-        ? 'Confirm restore this cancelled job?'
-        : 'Confirm cancel this job? It will be hidden unless Show cancelled is enabled.';
-      if(!confirm(msg)) return;
-
-      const dbId = String(it._db_id || it.id || '').trim();
-      const nextCancelled = !isCancelled;
-
-      if(dbId && window.sb){
-        try{
-          const { error } = await window.sb
-            .from('jobs')
-            .update({ cancelled: nextCancelled })
-            .eq('id', dbId);
-          if(error){
-            console.warn('[cancel-toggle] DB error:', error);
-            alert('Failed to update cancel status in database.');
+      const seeded = await runJobActionRpc('ensure_job_checklist', { p_job_id: dbId });
+      if(!seeded.ok){
+        checklistBox.textContent = 'Checklist: not available';
+        return;
+      }
+      const { data, error } = await window.sb
+        .from('job_checklist_items')
+        .select('id,title,is_required,completed')
+        .eq('job_id', dbId)
+        .order('sort_order', { ascending:true });
+      if(error){
+        checklistBox.textContent = 'Checklist: load failed';
+        return;
+      }
+      const rows = Array.isArray(data) ? data : [];
+      if(!rows.length){
+        checklistBox.textContent = 'Checklist: no items';
+        return;
+      }
+      checklistBox.innerHTML = '';
+      const title = el('div',{class:'small'}, 'Checklist');
+      title.style.fontWeight = '700';
+      checklistBox.appendChild(title);
+      for(const rowItem of rows){
+        const line = document.createElement('label');
+        line.className = 'small';
+        line.style.display = 'flex';
+        line.style.gap = '6px';
+        line.style.alignItems = 'center';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = !!rowItem.completed;
+        cb.disabled = !canExec;
+        cb.onchange = async ()=>{
+          const out = await runJobActionRpc('tech_toggle_checklist_item', { p_item_id: rowItem.id, p_completed: !!cb.checked });
+          if(!out.ok){
+            cb.checked = !cb.checked;
+            alert('Checklist update failed: ' + out.error);
             return;
           }
-          delete cancelOverrides[k];
-          saveOverrides();
-          await dbBootstrapJobsIntoPayload();
-        }catch(e){
-          console.warn('[cancel-toggle] DB exception:', e);
-          alert('Failed to update cancel status in database.');
-          return;
-        }
-      }else{
-        setManualLock(k);
-        if(isCancelled) delete cancelOverrides[k];
-        else cancelOverrides[k] = true;
-        saveOverrides();
+        };
+        line.appendChild(cb);
+        line.appendChild(document.createTextNode(String(rowItem.title||'') + (rowItem.is_required ? ' *' : '')));
+        checklistBox.appendChild(line);
       }
+    };
 
+    const refreshAfterExecution = async ()=>{
+      await dbBootstrapJobsIntoPayload();
       rerenderActive();
       try{
         const midOpen = String(parseInt(iso.slice(5,7),10));
@@ -1560,7 +1713,85 @@ function openDrawer(drawer, title, items, iso){
         openDrawer(drawer, `Jobs for ${iso} (${refreshed.length})`, refreshed, iso);
       }catch(e){}
     };
+
+    const btnStart = document.createElement('button');
+    btnStart.type='button';
+    btnStart.className='edbtn secondary';
+    btnStart.textContent='Start';
+    btnStart.disabled = !canExec || !dbId || statusNow==='completed';
+    btnStart.onclick = async ()=>{
+      const r = await runJobActionRpc('tech_start_job', { p_job_id: dbId, p_note: null });
+      if(!r.ok){ alert('Start failed: ' + r.error); return; }
+      await refreshAfterExecution();
+    };
+    actionsS.appendChild(btnStart);
+
+    const btnEnd = document.createElement('button');
+    btnEnd.type='button';
+    btnEnd.className='edbtn secondary';
+    btnEnd.textContent='End session';
+    btnEnd.disabled = !canExec || !dbId;
+    btnEnd.onclick = async ()=>{
+      const r = await runJobActionRpc('tech_end_work_session', { p_job_id: dbId, p_note: null });
+      if(!r.ok){ alert('End session failed: ' + r.error); return; }
+      await refreshAfterExecution();
+    };
+    actionsS.appendChild(btnEnd);
+
+    const btnDone = document.createElement('button');
+    btnDone.type='button';
+    btnDone.className='edbtn';
+    btnDone.textContent='Mark complete';
+    btnDone.disabled = !canExec || !dbId || statusNow==='completed';
+    btnDone.onclick = async ()=>{
+      if(!confirm('Mark this job as completed?')) return;
+      const r = await runJobActionRpc('tech_mark_job_completed', { p_job_id: dbId, p_note: null });
+      if(!r.ok){ alert('Complete failed: ' + r.error); return; }
+      await refreshAfterExecution();
+    };
+    actionsS.appendChild(btnDone);
+
+    const btnCancel = document.createElement('button');
+    btnCancel.type='button';
+    btnCancel.className='edbtn ' + (isCancelled ? 'secondary' : '');
+    btnCancel.textContent = isCancelled ? 'Restore' : 'Cancel';
+    btnCancel.disabled = !canExec;
+    btnCancel.onclick = async ()=>{
+      const msg = isCancelled
+        ? 'Confirm restore this cancelled job?'
+        : 'Confirm cancel this job? It will be hidden unless Show cancelled is enabled.';
+      if(!confirm(msg)) return;
+
+      if(dbId && window.sb){
+        let reasonCode = null;
+        let reasonNote = null;
+        if(!isCancelled){
+          reasonCode = String(prompt('Cancel reason code (client_request, no_access, traffic_driving, too_far, parts_missing, weather, other):', 'client_request') || '').trim();
+          if(!reasonCode){ alert('Cancel reason is required.'); return; }
+          reasonNote = String(prompt('Optional cancel note:', '') || '').trim();
+        }
+        const r = await runJobActionRpc('tech_set_job_cancelled', {
+          p_job_id: dbId,
+          p_cancelled: !isCancelled,
+          p_reason_code: reasonCode,
+          p_reason_note: reasonNote
+        });
+        if(!r.ok){ alert('Cancel/restore failed: ' + r.error); return; }
+        delete cancelOverrides[k];
+        saveOverrides();
+        await refreshAfterExecution();
+      }else{
+        if(!window.CAN_EDIT){ alert('Admin only for local jobs.'); return; }
+        setManualLock(k);
+        if(isCancelled) delete cancelOverrides[k];
+        else cancelOverrides[k] = true;
+        saveOverrides();
+        rerenderActive();
+      }
+    };
     actionsS.appendChild(btnCancel);
+    renderChecklist();
+
     grpS.appendChild(lblS);
     grpS.appendChild(actionsS);
     controls.appendChild(grpS);
@@ -2311,11 +2542,11 @@ function autoAssignTech(iso, plage, cand){
   const p = plage || 'AM';
   const norm=(s)=>String(s||'').trim().toLowerCase();
   const candReg = norm(cand && (cand.region || (cand.raw && cand.raw.city)));
+  const client = normalizeClientCode(cand && cand.client);
 
-  const PRIORITY = ["Adil","Abdel","Chadi","Tech A","Tech B"];
+  const PRIORITY = getPriorityTechList(iso, [], client);
 
-  // Prefer Adil for same-region pair (proxy for <=80km), if the slot is available
-  if(candReg){
+  if(candReg && canTechHandleClient('Adil', client)){
     const adilJobs = arr.filter(x => (x.tech||'')==='Adil');
     if(adilJobs.length===1){
       const r0 = norm(adilJobs[0].region || (adilJobs[0].raw && adilJobs[0].raw.city));
@@ -2325,13 +2556,11 @@ function autoAssignTech(iso, plage, cand){
     }
   }
 
-  // Default: fill by priority (max 2/day and max 1 per slot)
   for(const tech of PRIORITY){
     if(techCount(arr, tech) >= 2) continue;
     if(!slotTaken(arr, tech, p)) return tech;
   }
 
-  // If requested plage is full for all, try the other slot
   const other = (p==='AM')?'PM':'AM';
   for(const tech of PRIORITY){
     if(techCount(arr, tech) >= 2) continue;
@@ -2344,21 +2573,23 @@ function autoAssignTechAndPlage(iso,cand){
   const arr=getDaySchedule(iso);
   const norm=s=>String(s||'').trim().toLowerCase();
   const candReg=norm(cand&&(cand.region||(cand.raw&&cand.raw.city)));
-  if(candReg){
+  const client = normalizeClientCode(cand && cand.client);
+  if(candReg && canTechHandleClient('Adil', client)){
     const adilJobs=arr.filter(x=>(x.tech||'')==='Adil');
     if(adilJobs.length===1){
       const r0=norm(adilJobs[0].region||(adilJobs[0].raw&&adilJobs[0].raw.city));
       if(r0&&r0===candReg){
         const other=((adilJobs[0].plage||'AM')==='AM')?'PM':'AM';
-        if(techCount(arr,'Adil')<2&&!slotTaken(arr,'Adil',other))return{tech:'Adil',plage:other}
+        if(techCount(arr,'Adil')<2&&!slotTaken(arr,'Adil',other))return{tech:'Adil',plage:other};
       }
     }
   }
   const byTech=countSlotsFor(iso);
-  const p1=firstFreePlage(byTech,'Adil');
-  if(p1)return{tech:'Adil',plage:p1};
-  const p2=firstFreePlage(byTech,'Abdel');
-  if(p2)return{tech:'Abdel',plage:p2};
+  const priority = getPriorityTechList(iso, [], client);
+  for(const tech of priority){
+    const p = firstFreePlage(byTech, tech);
+    if(p) return { tech, plage:p };
+  }
   return{tech:'UNASSIGNED',plage:'AM'};
 }
 function addJobToBaseMonths(job, iso){
@@ -2447,7 +2678,7 @@ function importJobsCsv(file){
       let tech=normalizeTechName(row[iTech]);
       let plage='';
 
-      const cand = { region, raw:{city, address: addr}, destination };
+      const cand = { region, client, raw:{city, address: addr}, destination };
 
       if(!rawTime){
         if(tech && TECHS.includes(tech) && tech!=='UNASSIGNED'){
@@ -2708,9 +2939,8 @@ function isTechUnavailable(tech, iso, unavailable){
   );
 }
 
-function techPriorityForDate(iso, unavailable){
-  const base = (monthNum(iso)===4) ? plannerSettings.aprilPriority.slice() : plannerSettings.defaultPriority.slice();
-  return base.filter(t => !isTechUnavailable(t, iso, unavailable));
+function techPriorityForDate(iso, unavailable, client=''){
+  return getPriorityTechList(iso, unavailable, client);
 }
 
 function areaRuleAdjustment(job, candIso, candTech){
@@ -2751,6 +2981,7 @@ function collectJobsForPlanning(){
           slot:(plageOverrides[k]||it.plage||''),
           city:(it.region || it.raw?.city || ''),
           region:(it.region || it.raw?.city || ''),
+          client: normalizeClientCode(it.client||''),
           wo:it.wo||'',
           site:it.site||'',
           locked:isManualLocked(k),
@@ -2821,6 +3052,7 @@ function scorePlacement(job, candIso, candTech, candSlot, index, optimize){
 
 function feasible(index, iso, tech, slot, job){
   if(tech==='UNASSIGNED') return true;
+  if(job && !canTechHandleClient(tech, job.client)) return false;
   if(job && violatesStrictAreaRule(job, iso, tech)) return false;
   const cell = index[iso]?.[tech];
   const taken = cell ? (cell[slot]||0) : 0;
@@ -2857,9 +3089,9 @@ function computePlanScenario(jobs, unavailable, optimize){
 
     for(const off of dateOffsets){
       const candIso = isoAddDays(job.iso, off);
-      let priority = techPriorityForDate(candIso, unavailable);
+      let priority = techPriorityForDate(candIso, unavailable, job.client);
       if(!priority.length){
-        priority = (monthNum(candIso)===4) ? plannerSettings.aprilPriority.slice() : plannerSettings.defaultPriority.slice();
+        priority = getPriorityTechList(candIso, unavailable, job.client);
       }
       const techCandidates = priority.concat(['UNASSIGNED']);
       for(const candTech of techCandidates){
@@ -3458,7 +3690,7 @@ async function loadTeamMappings(){
     const { data, error } = await window.sb.rpc('admin_list_user_tech_mappings');
     if(error){
       console.warn('[loadTeamMappings] rpc error:', error);
-      alert('Team mapping API not ready. Run db/10_user_sync_and_admin_rpc.sql once in Supabase.');
+      alert('Team mapping API not ready. Run db/10_user_sync_and_admin_rpc.sql and db/12_tech_specialties_priority.sql in Supabase.');
       return [];
     }
     return Array.isArray(data) ? data : [];
@@ -3487,27 +3719,33 @@ function closeManageTeamModal(){
 function renderManageTeam(){
   const host=document.getElementById('manageTechsList');
   if(!host) return;
-  const opts=['','Adil','Abdel','Chadi','Tech A','Tech B'].map(t=>`<option value="${t}">${t||'-- Unmapped --'}</option>`).join('');
+  const techOpts=['','Adil','Abdel','Chadi','Tech A','Tech B'].map(t=>`<option value="${t}">${t||'-- Unmapped --'}</option>`).join('');
 
   if(!__teamRows.length){
     host.innerHTML='<div class="small">No users found.</div>';
     return;
   }
 
-  host.innerHTML = __teamRows.map((r,i)=>`
-    <div style="display:grid;grid-template-columns:minmax(220px,1fr) 170px 80px 140px;gap:8px;align-items:center;border:1px solid #eee;border-radius:10px;padding:8px;margin-bottom:8px">
-      <div>
-        <div style="font-weight:700">${r.email||'(no email)'}</div>
-        <div class="small" style="font-family:monospace">${r.user_id}</div>
+  host.innerHTML = __teamRows.map((r,i)=>{
+    const specsText = specialtiesToText(r.specialties || ['ALL']);
+    const prio = Number(r.priority_rank||100);
+    return `
+      <div style="display:grid;grid-template-columns:minmax(220px,1fr) 170px 80px 90px minmax(190px,1fr) 140px;gap:8px;align-items:center;border:1px solid #eee;border-radius:10px;padding:8px;margin-bottom:8px">
+        <div>
+          <div style="font-weight:700">${r.email||'(no email)'}</div>
+          <div class="small" style="font-family:monospace">${r.user_id}</div>
+        </div>
+        <select id="teamTech_${i}" class="edsel" style="min-width:160px">${techOpts}</select>
+        <label class="small" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="teamActive_${i}" ${r.mapping_active?'checked':''}/>Active</label>
+        <input id="teamPriority_${i}" class="edsel" type="number" min="1" max="999" value="${prio}" title="Lower number = higher priority" />
+        <input id="teamSpecs_${i}" class="edsel" value="${specsText}" placeholder="ALL or GOCO, MCN" title="Comma separated specialties" />
+        <div style="display:flex;gap:6px">
+          <button class="edbtn" type="button" data-save-team="${i}">Save</button>
+          <button class="edbtn secondary" type="button" data-clear-team="${i}">Clear</button>
+        </div>
       </div>
-      <select id="teamTech_${i}" class="edsel" style="min-width:160px">${opts}</select>
-      <label class="small" style="display:flex;align-items:center;gap:6px"><input type="checkbox" id="teamActive_${i}" ${r.mapping_active?'checked':''}/>Active</label>
-      <div style="display:flex;gap:6px">
-        <button class="edbtn" type="button" data-save-team="${i}">Save</button>
-        <button class="edbtn secondary" type="button" data-clear-team="${i}">Clear</button>
-      </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 
   __teamRows.forEach((r,i)=>{
     const sel=document.getElementById(`teamTech_${i}`);
@@ -3521,10 +3759,19 @@ function renderManageTeam(){
       if(!row) return;
       const tech=(document.getElementById(`teamTech_${i}`)?.value||'').trim();
       const active=!!document.getElementById(`teamActive_${i}`)?.checked;
+      const priorityRaw = Number(document.getElementById(`teamPriority_${i}`)?.value || 100);
+      const priority = Math.min(999, Math.max(1, Number.isFinite(priorityRaw) ? priorityRaw : 100));
+      const specialties = parseSpecialtiesInput(document.getElementById(`teamSpecs_${i}`)?.value || 'ALL');
       if(!tech){ alert('Select a tech name or click Clear.'); return; }
       const { error } = await window.sb.rpc('admin_set_user_tech_mapping', { p_user_id: row.user_id, p_tech_name: tech, p_is_active: active });
       if(error){ alert('Save failed: '+error.message); return; }
+      const { error: pErr } = await window.sb.rpc('admin_set_tech_profile_options', { p_user_id: row.user_id, p_priority_rank: priority, p_specialties: specialties });
+      if(pErr){
+        alert('Saved mapping, but profile options failed: '+pErr.message);
+      }
       await refreshManageTeam();
+      await refreshTechProfileRules();
+      rerenderActive();
     });
   });
 
@@ -3536,6 +3783,8 @@ function renderManageTeam(){
       const { error } = await window.sb.rpc('admin_clear_user_tech_mapping', { p_user_id: row.user_id });
       if(error){ alert('Clear failed: '+error.message); return; }
       await refreshManageTeam();
+      await refreshTechProfileRules();
+      rerenderActive();
     });
   });
 }
@@ -3978,7 +4227,7 @@ async function addJobFromModal(){
   let plage = plageSel;
 
   if(techSel==='AUTO' || plageSel==='AUTO'){
-    const cand = { region: (city||'').trim() || (((site||'').trim().split('-')[0])||''), raw:{city:(city||'').trim(), address:(address||'').trim()}, destination: jobDestinationFromFields(address, city, province) };
+    const cand = { region: (city||'').trim() || (((site||'').trim().split('-')[0])||''), client, raw:{city:(city||'').trim(), address:(address||'').trim()}, destination: jobDestinationFromFields(address, city, province) };
     const auto = autoAssignTechAndPlage(iso, cand);
     if(techSel==='AUTO') tech = auto.tech;
     if(plageSel==='AUTO') plage = auto.plage;
@@ -4741,7 +4990,9 @@ async function doLogin(e) {
 
     window.USE_DB_JOBS = true;                 // ✅ ADD
     window.IS_ADMIN = await dbIsAdmin();       // ✅ ADD (must be AFTER sign-in)
+    window.CURRENT_TECH_NAME = await dbResolveCurrentTechName();
     window.CAN_EDIT = window.IS_ADMIN;
+    window.CAN_EXECUTE = window.IS_ADMIN || !!window.CURRENT_TECH_NAME;
     const schema = await dbValidateRuntimeSchema();
     if(!schema.ok && window.IS_ADMIN){
       console.warn('[schema] runtime schema mismatch:', schema.missing);
@@ -4751,6 +5002,7 @@ async function doLogin(e) {
     __enterDbModeClean();
 
 try {
+  await refreshTechProfileRules();
   if (!window.__DB_BOOTSTRAPPED) {
     window.__DB_BOOTSTRAPPED = true;
     await dbBootstrapJobsIntoPayload();
@@ -4790,7 +5042,9 @@ if (window.paintBuildBadge) window.paintBuildBadge();
 
     window.USE_DB_JOBS = true;
     window.IS_ADMIN = await dbIsAdmin();       // ✅ ADD
+    window.CURRENT_TECH_NAME = await dbResolveCurrentTechName();
     window.CAN_EDIT = window.IS_ADMIN;
+    window.CAN_EXECUTE = window.IS_ADMIN || !!window.CURRENT_TECH_NAME;
     const schema = await dbValidateRuntimeSchema();
     if(!schema.ok && window.IS_ADMIN){
       console.warn('[schema] runtime schema mismatch:', schema.missing);
@@ -4799,6 +5053,7 @@ if (window.paintBuildBadge) window.paintBuildBadge();
     __enterDbModeClean();                      // ✅ ADD (recommended for consistency)
 
     try {
+      await refreshTechProfileRules();
       if (!window.__DB_BOOTSTRAPPED) {
         window.__DB_BOOTSTRAPPED = true;
         await dbBootstrapJobsIntoPayload();
@@ -4838,6 +5093,8 @@ if (window.paintBuildBadge) window.paintBuildBadge();
       window.__DB_BOOTSTRAPPED = false; // ✅ allow bootstrap next login
       window.USE_DB_JOBS = false;
       window.IS_ADMIN = false;                   // ✅ ADD
+      window.CURRENT_TECH_NAME = '';
+      window.CAN_EXECUTE = false;
       window.__ENTER_DB_MODE_DONE = false;       // ✅ ADD (so a new login can clean again)
       try{ localStorage.removeItem('dispatch_base_months_v1'); }catch(e){}
   
