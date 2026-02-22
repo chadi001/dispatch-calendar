@@ -506,7 +506,7 @@ async function dbLoadJobs() {
     console.warn("[dbLoadJobs] admin check exception:", e);
   }
 
-  // 2) Tech users: RLS first + local safeguard filter by mapped tech
+  // 2) Tech users: rely on RLS visibility from database
   const myTechs = await dbResolveCurrentTechNames(user);
   window.CURRENT_TECH_NAMES = myTechs;
   window.CURRENT_TECH_NAME = myTechs[0] || '';
@@ -518,42 +518,8 @@ async function dbLoadJobs() {
   if (error) throw error;
 
   const rows = data || [];
-  if(!myTechs.length){
-    console.warn('[dbLoadJobs] no mapping resolved; returning empty for safety');
-    return [];
-  }
-
-  const norm = v => String(v||'').trim().toLowerCase();
-  const techSet = new Set(myTechs.map(norm));
-  let extraAssigned = new Set();
-  try{
-    let ja = [];
-    let jaErr = null;
-    try{
-      const res = await window.sb
-        .from('job_assignments')
-        .select('job_id,tech_name')
-        .in('tech_name', myTechs);
-      ja = res.data || [];
-      jaErr = res.error || null;
-    }catch(e){
-      const collected = [];
-      for(const t of myTechs){
-        const one = await window.sb.from('job_assignments').select('job_id,tech_name').eq('tech_name', t);
-        if(!one.error && Array.isArray(one.data)) collected.push(...one.data);
-      }
-      ja = collected;
-    }
-    if(!jaErr && Array.isArray(ja)){
-      extraAssigned = new Set(ja.map(x=>String(x.job_id||'')).filter(Boolean));
-    }
-  }catch(e){
-    console.warn('[dbLoadJobs] job_assignments fallback err:', e);
-  }
-
-  const filtered = rows.filter(r => techSet.has(norm(r.tech_name)) || extraAssigned.has(String(r.id||'')));
-  console.log("[dbLoadJobs] TECH mode rows:", rows.length, "mapped techs:", myTechs.join(', '), "via assignments:", extraAssigned.size, "visible:", filtered.length);
-  return filtered;
+  console.log("[dbLoadJobs] TECH mode rows (RLS):", rows.length, "mapped techs:", myTechs.join(', '));
+  return rows;
 } // ✅ CLOSE dbLoadJobs()
 
 
