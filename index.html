@@ -27,9 +27,9 @@ h2{margin:0 0 6px 0;}
 .navQuick{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0 0 0}
 .navBtn{display:inline-flex;align-items:center;gap:6px;border:1px solid #d1d5db;background:#fff;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:700;color:#1f2937;text-decoration:none}
 .navBtn:hover{background:#eef2ff;border-color:#b6c6ff}
-.toolbar{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:12px;align-items:start;margin:10px 0 12px 0;max-width:1400px}
+.toolbar{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,340px);gap:12px;align-items:start;margin:10px 0 12px 0;width:100%;max-width:none}
 .toolbarMain{display:flex;gap:10px;flex-wrap:wrap;align-items:end;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:10px}
-.toolbarSide{display:flex;flex-direction:column;gap:8px;position:sticky;top:10px}
+.toolbarSide{display:flex;flex-direction:column;gap:8px;position:sticky;top:10px;justify-self:end;width:min(100%,340px)}
 .field{display:flex;flex-direction:column;gap:6px;}
 .techFilters summary{cursor:pointer;font-size:12px;font-weight:800;color:#374151}
 .techFilters{border:1px dashed #dbe2ea;border-radius:10px;padding:6px 8px;background:#fbfdff}
@@ -1545,6 +1545,69 @@ async function runJobActionRpc(fn, payload){
   }
 }
 
+const CANCEL_REASON_OPTIONS = [
+  { code:'client_request', label:'Client request' },
+  { code:'no_access', label:'No access' },
+  { code:'traffic_driving', label:'Traffic / driving' },
+  { code:'too_far', label:'Too far' },
+  { code:'parts_missing', label:'Parts missing' },
+  { code:'weather', label:'Weather' },
+  { code:'other', label:'Other' }
+];
+
+function pickCancelReason(){
+  return new Promise((resolve)=>{
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+
+    const optionHtml = CANCEL_REASON_OPTIONS
+      .map(o=>`<option value="${o.code}">${o.label}</option>`)
+      .join('');
+
+    modal.innerHTML = `
+      <div class="modal-backdrop"></div>
+      <div class="modal-dialog" style="max-width:520px;">
+        <div class="modal-header">
+          <div class="modal-title">Cancel job</div>
+        </div>
+        <div class="modal-body" style="max-height:none;overflow:visible;display:flex;flex-direction:column;gap:10px;">
+          <label for="cancelReasonSelect" style="font-size:13px;font-weight:800;color:#334155;">Cancel reason</label>
+          <select id="cancelReasonSelect" style="min-width:0;width:100%;">
+            ${optionHtml}
+          </select>
+          <label for="cancelReasonNote" style="font-size:13px;font-weight:800;color:#334155;">Optional note</label>
+          <input id="cancelReasonNote" type="text" placeholder="Add details (optional)" style="height:38px;border:1px solid #d1d5db;border-radius:10px;padding:0 10px;"/>
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px;">
+            <button type="button" class="edbtn secondary" id="cancelReasonDismiss">Close</button>
+            <button type="button" class="edbtn" id="cancelReasonConfirm">Confirm cancel</button>
+          </div>
+        </div>
+      </div>`;
+
+    const close = (result)=>{
+      try{ modal.remove(); }catch(e){}
+      resolve(result);
+    };
+
+    const sel = modal.querySelector('#cancelReasonSelect');
+    const note = modal.querySelector('#cancelReasonNote');
+    modal.querySelector('#cancelReasonDismiss').onclick = ()=>close(null);
+    modal.querySelector('#cancelReasonConfirm').onclick = ()=>{
+      const reasonCode = String(sel?.value || '').trim();
+      if(!reasonCode){
+        alert('Cancel reason is required.');
+        return;
+      }
+      close({ reasonCode, reasonNote: String(note?.value || '').trim() });
+    };
+    const backdrop = modal.querySelector('.modal-backdrop');
+    if(backdrop) backdrop.onclick = ()=>close(null);
+
+    document.body.appendChild(modal);
+    if(note) setTimeout(()=>note.focus(), 0);
+  });
+}
+
 function statusChipText(status){
   const s = String(status||'scheduled').toLowerCase();
   if(s==='in_progress') return 'IN PROGRESS';
@@ -1857,9 +1920,10 @@ function openDrawer(drawer, title, items, iso){
         let reasonCode = null;
         let reasonNote = null;
         if(!isCancelled){
-          reasonCode = String(prompt('Cancel reason code (client_request, no_access, traffic_driving, too_far, parts_missing, weather, other):', 'client_request') || '').trim();
-          if(!reasonCode){ alert('Cancel reason is required.'); return; }
-          reasonNote = String(prompt('Optional cancel note:', '') || '').trim();
+          const cancelMeta = await pickCancelReason();
+          if(!cancelMeta) return;
+          reasonCode = cancelMeta.reasonCode;
+          reasonNote = cancelMeta.reasonNote;
         }
         const r = await runJobActionRpc('tech_set_job_cancelled', {
           p_job_id: dbId,
