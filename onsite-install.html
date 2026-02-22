@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Onsite Install</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root{--bg:#f6f8fb;--card:#fff;--text:#0f172a;--muted:#64748b;--line:#e2e8f0;--ink:#1d4ed8}
+    *{box-sizing:border-box} body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    .wrap{max-width:1100px;margin:0 auto;padding:14px}
+    .top{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px}
+    input,select,button{height:36px;border:1px solid #cbd5e1;border-radius:10px;padding:0 10px}
+    button{cursor:pointer;background:#fff}
+    button.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+    .small{font-size:12px;color:var(--muted)}
+    .grid{display:grid;gap:10px;margin-top:12px}
+    .job{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px}
+    .h{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap}
+    .badge{font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;border:1px solid #ddd;background:#fff}
+    .scheduled{color:#1d4ed8;border-color:#93c5fd;background:#eff6ff}
+    .in_progress{color:#92400e;border-color:#fcd34d;background:#fffbeb}
+    .completed{color:#065f46;border-color:#86efac;background:#ecfdf5}
+    .cancelled{color:#991b1b;border-color:#fca5a5;background:#fef2f2}
+    .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .check{margin-top:8px;padding-top:8px;border-top:1px dashed #cbd5e1}
+    .check label{display:flex;gap:6px;align-items:center;margin:4px 0;font-size:13px}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <form id="loginForm" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <input id="email" type="email" placeholder="email" required />
+      <input id="password" type="password" placeholder="password" required />
+      <button class="primary" type="submit">Login</button>
+    </form>
+    <button id="btnLogout" style="display:none">Logout</button>
+    <span id="authStatus" class="small">Not signed in</span>
+    <select id="dateMode" style="margin-left:auto"><option value="today">Today</option><option value="all">All dates</option></select>
+    <button id="btnReload">Reload</button>
+  </div>
+  <div id="jobs" class="grid"></div>
+</div>
+<script>
+const SUPABASE_URL = 'https://mycgdissxzsizoywcwps.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15Y2dkaXNzeHpzaXpveXdjd3BzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxNzkyNDEsImV4cCI6MjA4NTc1NTI0MX0.1-3qDwNwFeqlHjn-jCACOtV5U2yhgEsQ1yUM-m2TKZg';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:'dispatch-auth-v1'} });
+let me = { user:null, techName:'', isAdmin:false };
+
+function todayIso(){ return new Date().toISOString().slice(0,10); }
+function esc(s){ return String(s||'').replace(/[&<>\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
+function statusClass(s){ s=String(s||'scheduled').toLowerCase(); return ['scheduled','in_progress','completed','cancelled'].includes(s)?s:'scheduled'; }
+async function rpc(fn, args){ const { error } = await sb.rpc(fn, args||{}); return { ok:!error, error:error?.message||'' }; }
+
+async function resolveTechName(){
+  try{ const { data } = await sb.rpc('current_tech_name'); if(data) return String(data).trim(); }catch(e){}
+  const uid = me.user?.id;
+  if(!uid) return '';
+  const { data } = await sb.from('tech_name_map').select('tech_name').eq('user_id',uid).eq('is_active',true).maybeSingle();
+  return data?.tech_name || '';
+}
+
+async function loadChecklist(jobId){
+  await rpc('ensure_job_checklist', { p_job_id: jobId });
+  const { data, error } = await sb.from('job_checklist_items').select('id,title,is_required,completed').eq('job_id',jobId).order('sort_order',{ascending:true});
+  if(error) return [];
+  return data||[];
+}
+
+async function loadJobs(){
+  const host=document.getElementById('jobs');
+  host.innerHTML='<div class="small">Loading...</div>';
+  let q=sb.from('jobs').select('id,job_date,client,site,wo,city,address,plage,tech_name,status,cancelled,cancel_reason_code,actual_start_at,actual_end_at').order('job_date',{ascending:true});
+  if(!me.isAdmin && me.techName) q=q.eq('tech_name', me.techName);
+  const dateMode=document.getElementById('dateMode').value;
+  if(dateMode==='today') q=q.eq('job_date', todayIso());
+  const { data, error } = await q;
+  if(error){ host.innerHTML='<div class="small">Load failed: '+esc(error.message)+'</div>'; return; }
+  if(!data?.length){ host.innerHTML='<div class="small">No jobs.</div>'; return; }
+  host.innerHTML='';
+  for(const j of data){
+    const card=document.createElement('div');
+    card.className='job';
+    const status=(j.status||(j.cancelled?'cancelled':'scheduled')).toLowerCase();
+    const ck=await loadChecklist(j.id);
+    const ckHtml = ck.map(it=>`<label><input type="checkbox" data-item="${it.id}" ${it.completed?'checked':''}/> ${esc(it.title)}${it.is_required?' *':''}</label>`).join('') || '<div class="small">No checklist items</div>';
+    card.innerHTML=`
+      <div class="h">
+        <div><b>${esc(j.client||'')}</b> | ${esc(j.wo||j.site||'')}</div>
+        <span class="badge ${statusClass(status)}">${esc(status.replace('_',' ').toUpperCase())}</span>
+      </div>
+      <div class="small">${esc(j.job_date||'')} ${esc(j.plage||'')} | ${esc(j.tech_name||'')} | ${esc(j.city||'')}</div>
+      <div class="small">${esc(j.address||'')}</div>
+      <div class="small">Start: ${esc(j.actual_start_at||'-')} | End: ${esc(j.actual_end_at||'-')}</div>
+      ${j.cancel_reason_code?`<div class="small">Cancel reason: ${esc(j.cancel_reason_code)}</div>`:''}
+      <div class="row">
+        <button data-act="start">Start</button>
+        <button data-act="end">End session</button>
+        <button data-act="done" class="primary">Mark complete</button>
+        <button data-act="cancel">${status==='cancelled'?'Restore':'Cancel'}</button>
+      </div>
+      <div class="check">${ckHtml}</div>
+    `;
+
+    card.querySelectorAll('input[type="checkbox"][data-item]').forEach(cb=>cb.addEventListener('change', async ()=>{
+      const out = await rpc('tech_toggle_checklist_item', { p_item_id: cb.getAttribute('data-item'), p_completed: !!cb.checked });
+      if(!out.ok){ cb.checked=!cb.checked; alert(out.error||'Checklist update failed'); }
+    }));
+
+    card.querySelector('[data-act="start"]').onclick=async()=>{ const out=await rpc('tech_start_job',{p_job_id:j.id,p_note:null}); if(!out.ok) return alert(out.error); await loadJobs(); };
+    card.querySelector('[data-act="end"]').onclick=async()=>{ const out=await rpc('tech_end_work_session',{p_job_id:j.id,p_note:null}); if(!out.ok) return alert(out.error); await loadJobs(); };
+    card.querySelector('[data-act="done"]').onclick=async()=>{ if(!confirm('Mark completed?')) return; const out=await rpc('tech_mark_job_completed',{p_job_id:j.id,p_note:null}); if(!out.ok) return alert(out.error); await loadJobs(); };
+    card.querySelector('[data-act="cancel"]').onclick=async()=>{
+      const doCancel = status!=='cancelled';
+      if(doCancel){
+        const reason = prompt('Cancel reason code (client_request, no_access, traffic_driving, too_far, parts_missing, weather, other):','client_request');
+        if(!reason) return;
+        const note = prompt('Optional note','') || null;
+        const out=await rpc('tech_set_job_cancelled',{p_job_id:j.id,p_cancelled:true,p_reason_code:reason,p_reason_note:note});
+        if(!out.ok) return alert(out.error);
+      }else{
+        const out=await rpc('tech_set_job_cancelled',{p_job_id:j.id,p_cancelled:false,p_reason_code:null,p_reason_note:null});
+        if(!out.ok) return alert(out.error);
+      }
+      await loadJobs();
+    };
+
+    host.appendChild(card);
+  }
+}
+
+async function afterSignIn(){
+  const { data:{ user } } = await sb.auth.getUser();
+  me.user = user;
+  if(!user) return;
+  const { data: adminRow } = await sb.from('admin_users').select('user_id').eq('user_id', user.id).maybeSingle();
+  me.isAdmin = !!adminRow;
+  me.techName = await resolveTechName();
+  document.getElementById('authStatus').textContent = `Signed in: ${user.email||''} ${me.isAdmin?'(admin)':''} ${me.techName?'- '+me.techName:''}`;
+  document.getElementById('loginForm').style.display='none';
+  document.getElementById('btnLogout').style.display='inline-block';
+  await loadJobs();
+}
+
+document.getElementById('loginForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const email=document.getElementById('email').value.trim();
+  const password=document.getElementById('password').value;
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if(error) return alert(error.message);
+  await afterSignIn();
+});
+document.getElementById('btnLogout').onclick=async()=>{ await sb.auth.signOut(); location.reload(); };
+document.getElementById('btnReload').onclick=()=>loadJobs();
+document.getElementById('dateMode').onchange=()=>loadJobs();
+
+(async()=>{ await afterSignIn(); })();
+</script>
+</body>
+</html>

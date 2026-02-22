@@ -822,6 +822,15 @@ function scheduleSaveOverridesToDB(){
           <option value="COGO">COGO</option>
           <option value="MCN">MCN</option>
         </select>
+        <label for="statusFilterSide" style="margin-top:8px">Job status</label>
+        <select id="statusFilterSide">
+          <option value="ALL">All</option>
+          <option value="scheduled">Scheduled</option>
+          <option value="in_progress">In progress</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+          <option value="on_hold">On hold</option>
+        </select>
         <details class="techFilters" id="techFiltersPanel" open>
           <summary>Tech filters</summary>
           <div class="techchecks" id="techChecks" style="margin-top:6px;"></div>
@@ -886,6 +895,7 @@ function scheduleSaveOverridesToDB(){
           <button class="reset" id="btnManageAreaRules" type="button">Manage area rules</button>
           <button class="reset" id="btnManageGroups" type="button">Manage groups</button>
           <button class="reset" id="btnHelpGuide" type="button">Help / Tutorial</button>
+          <button class="reset" id="btnOnsiteInstall" type="button">Onsite install page</button>
           <button class="reset" id="btnExportJobsCsv" type="button">Export jobs CSV</button>
           <button class="reset" id="btnExportOverridesJson" type="button">Export overrides JSON</button>
           <button class="reset" id="btnImportOverridesJson" type="button">Import overrides JSON</button>
@@ -1269,6 +1279,7 @@ const content=document.getElementById('content');
 const regionFilter=document.getElementById('regionFilter');
 const clientFilter=document.getElementById('clientFilter');
 const clientFilterSide=document.getElementById('clientFilterSide');
+const statusFilterSide=document.getElementById('statusFilterSide');
 const problemsOnly=document.getElementById('problemsOnly');
 const showCancelled=document.getElementById('showCancelled');
 const resetBtn=document.getElementById('resetBtn');
@@ -1393,6 +1404,7 @@ function currentFilters(){
     techs:selectedTechs(),
     region:regionFilter.value,
     client:clientVal,
+    status:String(statusFilterSide?.value || 'ALL'),
     problemsOnly:problemsOnly.checked,
     showCancelled:(document.getElementById('showCancelled')||{checked:false}).checked,
     groups:selectedGroups()
@@ -1439,6 +1451,7 @@ function matchFilters(it, filters){
     const sameClient = (want==='GOCO' || want==='COGO') ? (c==='GOCO' || c==='COGO') : (c===want);
     if(!sameClient) return false;
   }
+  if((filters.status||'ALL')!=='ALL' && String(it.status||'scheduled').toLowerCase() !== String(filters.status).toLowerCase()) return false;
   if(filters.groups && filters.groups.length>0){
     if(!it.teamJob || !it.groupName || !filters.groups.includes(it.groupName)) return false;
   }
@@ -2268,6 +2281,7 @@ function hasActiveFilters(){
   if(f.techs.length > 0) return true;
   if(f.region !== 'ALL') return true;
   if(f.client !== 'ALL') return true;
+  if(f.status !== 'ALL') return true;
   if(f.problemsOnly) return true;
   if(f.showCancelled) return true;
   if(f.groups.length > 0) return true;
@@ -2343,7 +2357,7 @@ function renderKpis(){
   // Year-to-date total (all interventions, excluding cancelled)
   const yEl=document.getElementById('yearTotal');
   if(yEl){
-    const allFilters={techs:[], region:"ALL", client:"ALL", groups:[], problemsOnly:false, showCancelled:false};
+    const allFilters={techs:[], region:"ALL", client:"ALL", status:"ALL", groups:[], problemsOnly:false, showCancelled:false};
     const allItems=collectAllItems(allFilters);
     yEl.textContent = `Year total: ${allItems.length}`;
   }
@@ -4045,6 +4059,7 @@ document.getElementById('btnHelpGuide')?.addEventListener('click', openHelpGuide
 document.getElementById('btnCloseHelpGuide')?.addEventListener('click', closeHelpGuide);
 document.getElementById('btnCloseHelpGuide2')?.addEventListener('click', closeHelpGuide);
 document.getElementById('helpGuideBackdrop')?.addEventListener('click', closeHelpGuide);
+document.getElementById('btnOnsiteInstall')?.addEventListener('click', ()=>window.open('onsite-install.html','_blank'));
 
 applyFeatureUiState();
 
@@ -4756,6 +4771,7 @@ if(clientFilterSide){
 if(clientFilter && clientFilterSide){
   clientFilterSide.value = clientFilter.value;
 }
+if(statusFilterSide){ statusFilterSide.onchange = rerenderActive; }
 problemsOnly.onchange=rerenderActive;
 showCancelled.onchange=rerenderActive;
 resetBtn.onclick=()=>{
@@ -4763,6 +4779,7 @@ resetBtn.onclick=()=>{
   regionFilter.value='ALL';
   if(clientFilter) clientFilter.value='ALL';
   if(clientFilterSide) clientFilterSide.value='ALL';
+  if(statusFilterSide) statusFilterSide.value='ALL';
   problemsOnly.checked=false;
   if(showCancelled) showCancelled.checked=false;
   document.querySelectorAll('#groupChecks input[type=checkbox]').forEach(cb=>cb.checked=false);
