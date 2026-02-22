@@ -445,8 +445,7 @@ button.reset:hover{background:#f6f8ff;}
     if(au?.user_id){
       const { data, error } = await window.sb
         .from("jobs")
-        .select("*")
-        .eq("cancelled", false);
+        .select("*");
 
       console.log("[dbLoadJobs] ADMIN mode rows:", data?.length, "err:", error);
       if (error) throw error;
@@ -481,8 +480,7 @@ button.reset:hover{background:#f6f8ff;}
 
   const { data, error } = await window.sb
     .from("jobs")
-    .select("*")
-    .eq("cancelled", false);
+    .select("*");
 
   if (error) throw error;
 
@@ -634,6 +632,7 @@ function jobRowToPayloadItem(r){
     tech: String(pickField(r, APP_META.jobsCanonical.tech, 'UNASSIGNED') || 'UNASSIGNED'),
     job_desc: r.job_desc || '',
     additional_techs: (__jobAssignmentsMap && __jobAssignmentsMap[r.id]) ? (__jobAssignmentsMap[r.id].slice()) : [],
+    cancelled: !!r.cancelled,
     _db_id: r.id
   };
 }
@@ -859,6 +858,10 @@ function scheduleSaveOverridesToDB(){
         <button class="reset" id="btnPlanApply" type="button">Apply scenario</button>
         <button class="reset" id="btnSyncToDb" type="button" style="background:#059669;color:#fff;border-color:#059669;">Sync to Database</button>
         <button class="reset" id="btnPlanReset" type="button">Reset to imported data</button>
+        <select id="resetBatchSelect" class="edsel" style="min-width:260px;height:38px">
+          <option value="">Select import batch...</option>
+        </select>
+        <button class="reset" id="btnRefreshBatches" type="button">Refresh imports</button>
         <button class="reset" id="btnPlanExport" type="button">Export scenario CSV</button>
       </div>
 
@@ -1326,7 +1329,7 @@ function normalizeDisplayItem(it, iso){
     groupName: g ? g.name : '',
     groupColor: g ? g.color : '',
     unassigned: isUnassignedTech(tech) && !teamJob,
-    _cancelled: !!cancelOverrides[k]
+    _cancelled: (!!it.cancelled) || !!cancelOverrides[k]
   };
 }
 function matchFilters(it, filters){
@@ -1412,7 +1415,7 @@ function openDrawer(drawer, title, items, iso){
   }
   for(const it of items){
     const kPre = jobKey(it, iso);
-    const isCancelled = !!cancelOverrides[kPre];
+    const isCancelled = !!it._cancelled;
     const row=el('div',{class:'item'+(it.unassigned?' unassigned':'')+(it.teamJob?' teamjob':'')+(isCancelled?' cancelled':'')});
     if(it.teamJob && it.groupColor){
       row.style.borderColor = it.groupColor;
@@ -1509,24 +1512,53 @@ function openDrawer(drawer, title, items, iso){
     btnCancel.type='button';
     btnCancel.className='edbtn ' + (isCancelled ? 'secondary' : '');
     btnCancel.textContent = isCancelled ? 'Restore' : 'Cancel';
-    btnCancel.onclick = ()=>{
-     if(!window.CAN_EDIT){
+    btnCancel.onclick = async ()=>{
+      if(!window.CAN_EDIT){
         alert("Admin only");
         return;
-    }
+      }
 
-    const msg = isCancelled
-      ? 'Confirm restore this cancelled job?'
-      : 'Confirm cancel this job? It will be hidden unless Show cancelled is enabled.';
-    if(!confirm(msg)) return;
+      const msg = isCancelled
+        ? 'Confirm restore this cancelled job?'
+        : 'Confirm cancel this job? It will be hidden unless Show cancelled is enabled.';
+      if(!confirm(msg)) return;
 
-    setManualLock(k);
-    if(isCancelled){ delete cancelOverrides[k]; } else { cancelOverrides[k]=true; }
-    saveOverrides();
-    rerenderActive();
-      try{ const midOpen = String(parseInt(iso.slice(5,7),10));
+      const dbId = String(it._db_id || it.id || '').trim();
+      const nextCancelled = !isCancelled;
+
+      if(dbId && window.sb){
+        try{
+          const { error } = await window.sb
+            .from('jobs')
+            .update({ cancelled: nextCancelled })
+            .eq('id', dbId);
+          if(error){
+            console.warn('[cancel-toggle] DB error:', error);
+            alert('Failed to update cancel status in database.');
+            return;
+          }
+          delete cancelOverrides[k];
+          saveOverrides();
+          await dbBootstrapJobsIntoPayload();
+        }catch(e){
+          console.warn('[cancel-toggle] DB exception:', e);
+          alert('Failed to update cancel status in database.');
+          return;
+        }
+      }else{
+        setManualLock(k);
+        if(isCancelled) delete cancelOverrides[k];
+        else cancelOverrides[k] = true;
+        saveOverrides();
+      }
+
+      rerenderActive();
+      try{
+        const midOpen = String(parseInt(iso.slice(5,7),10));
         const mmOpen = payload.months[midOpen];
-        const refreshed = itemsForDate(mmOpen, iso, currentFilters()); openDrawer(drawer, `Jobs for ${iso} (${refreshed.length})`, refreshed, iso); }catch(e){}
+        const refreshed = itemsForDate(mmOpen, iso, currentFilters());
+        openDrawer(drawer, `Jobs for ${iso} (${refreshed.length})`, refreshed, iso);
+      }catch(e){}
     };
     actionsS.appendChild(btnCancel);
     grpS.appendChild(lblS);
@@ -2375,7 +2407,7 @@ function exportJobsCsv(){
 }
 function importJobsCsv(file){
   const reader=new FileReader();
-  reader.onload=()=>{
+  reader.onload=async ()=>{
     const txt=String(reader.result||'');
     const rows=parseCsv(txt);
     if(rows.length<2){ alert('CSV vide'); return; }
@@ -2392,13 +2424,13 @@ function importJobsCsv(file){
     const iTech=idx("Tech Assigned");
     const iLink=idx("Google Maps Link");
 
+    const records=[];
     let added=0, unassigned=0;
     for(let r=1;r<rows.length;r++){
       const row=rows[r];
       const iso=toIsoDate(row[iDate]);
       if(!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) continue;
 
-      // Extract location fields first (needed for region-aware auto assignment)
       const city=(row[iCity]||'').trim();
       const addr=(row[iAddr]||'').trim();
       const province=(row[iProv]||'').trim();
@@ -2418,7 +2450,6 @@ function importJobsCsv(file){
       const cand = { region, raw:{city, address: addr}, destination };
 
       if(!rawTime){
-        // Auto-pick AM then PM when Start Time is empty.
         if(tech && TECHS.includes(tech) && tech!=='UNASSIGNED'){
           const arr=getDaySchedule(iso);
           if(techCount(arr, tech) < 2){
@@ -2451,12 +2482,114 @@ function importJobsCsv(file){
         unassigned: tech==='UNASSIGNED',
         raw: {city, address: addr, prov_site: site, order_number: wo, work_order: wo}
       };
+
       addJobToBaseMonths(job, iso);
+      records.push({ iso, job, city, address: addr, province, site, wo, client });
       added++;
       if(job.unassigned) unassigned++;
     }
+
+    const canImportToDb = !!(window.USE_DB_JOBS && window.sb && window.IS_ADMIN);
+    if(!canImportToDb){
+      rerenderActive();
+      alert(`Import terminé: ${added} ajout(s). UNASSIGNED: ${unassigned}.`);
+      return;
+    }
+
+    if(!records.length){
+      await dbBootstrapJobsIntoPayload();
+      rerenderActive();
+      alert('Import terminé: 0 ajout.');
+      return;
+    }
+
+    const userRes = await window.sb.auth.getUser();
+    const importedBy = userRes?.data?.user?.id || null;
+    const filename = String(file?.name || 'ui_import.csv').trim() || 'ui_import.csv';
+
+    const { data: batchRow, error: batchErr } = await window.sb
+      .from('import_batches')
+      .insert({ filename, imported_by: importedBy, row_count: 0, note: 'UI CSV import' })
+      .select('id')
+      .single();
+
+    if(batchErr || !batchRow?.id){
+      console.warn('[importJobsCsv] batch create failed:', batchErr);
+      await dbBootstrapJobsIntoPayload();
+      rerenderActive();
+      alert('Import failed: missing import batch tables. Run db/11_import_batches_and_reset.sql');
+      return;
+    }
+
+    const batchId = batchRow.id;
+    const nowIso = new Date().toISOString();
+    const toInsert = records.map(rec=>({
+      job_date: rec.iso,
+      client: rec.client || null,
+      site: rec.site || null,
+      wo: rec.wo || null,
+      province: rec.province || null,
+      city: rec.city || null,
+      address: rec.address || null,
+      slot: (rec.job.plage==='PM'?'PM':'AM'),
+      plage: (rec.job.plage==='PM'?'PM':'AM'),
+      tech_name: rec.job.tech || 'UNASSIGNED',
+      cancelled: false,
+      manual_lock: false,
+      import_batch_id: batchId,
+      imported_at: nowIso,
+      import_source: 'ui_csv'
+    }));
+
+    const insertedRows=[];
+    const chunkSize=200;
+    let failed=0;
+    for(let i=0;i<toInsert.length;i+=chunkSize){
+      const chunk = toInsert.slice(i, i+chunkSize);
+      const { data, error } = await window.sb
+        .from('jobs')
+        .insert(chunk)
+        .select('id,job_date,tech_name,slot,plage,cancelled,import_batch_id');
+      if(error){
+        console.warn('[importJobsCsv] jobs insert chunk error:', error);
+        failed += chunk.length;
+      }else if(Array.isArray(data)){
+        insertedRows.push(...data);
+      }
+    }
+
+    if(insertedRows.length){
+      const baseRows = insertedRows.map(r=>({
+        batch_id: batchId,
+        job_id: r.id,
+        baseline_job_date: r.job_date,
+        baseline_tech_name: r.tech_name || 'UNASSIGNED',
+        baseline_slot: r.slot || 'AM',
+        baseline_plage: r.plage || r.slot || 'AM',
+        baseline_cancelled: !!r.cancelled
+      }));
+      for(let i=0;i<baseRows.length;i+=chunkSize){
+        const chunk = baseRows.slice(i, i+chunkSize);
+        const { error } = await window.sb
+          .from('import_batch_job_baseline')
+          .insert(chunk);
+        if(error){
+          console.warn('[importJobsCsv] baseline insert chunk error:', error);
+        }
+      }
+    }
+
+    await window.sb
+      .from('import_batches')
+      .update({ row_count: insertedRows.length })
+      .eq('id', batchId);
+
+    await refreshImportBatchOptions(batchId);
+    await dbBootstrapJobsIntoPayload();
     rerenderActive();
-    alert(`Import terminé: ${added} ajout(s). UNASSIGNED: ${unassigned}.`);
+
+    const okCount = insertedRows.length;
+    alert(`Import terminé: ${okCount} ajout(s) en base. UNASSIGNED: ${unassigned}.` + (failed ? ` Failed: ${failed}.` : ''));
   };
   reader.readAsText(file);
 }
@@ -3037,6 +3170,80 @@ function loadDbBackup(){
   }
 }
 
+let __importBatches = [];
+
+function formatImportBatchLabel(b){
+  const when = b.imported_at ? new Date(b.imported_at).toLocaleString() : 'unknown date';
+  const name = b.filename || 'Unnamed CSV';
+  const rows = Number(b.row_count || 0);
+  return `${name} (${rows} rows, ${when})`;
+}
+
+async function refreshImportBatchOptions(preferredId=''){
+  const sel = document.getElementById('resetBatchSelect');
+  if(!sel) return;
+  if(!window.sb || !window.IS_ADMIN){
+    sel.innerHTML = '<option value="">Select import batch...</option>';
+    return;
+  }
+  try{
+    const { data, error } = await window.sb
+      .from('import_batches')
+      .select('id,filename,imported_at,row_count')
+      .order('imported_at', { ascending:false })
+      .limit(200);
+    if(error){
+      console.warn('[refreshImportBatchOptions] error:', error);
+      sel.innerHTML = '<option value="">Select import batch...</option>';
+      return;
+    }
+    __importBatches = Array.isArray(data) ? data : [];
+    const opts = ['<option value="">Select import batch...</option>'];
+    __importBatches.forEach(b=>{
+      opts.push(`<option value="${b.id}">${formatImportBatchLabel(b)}</option>`);
+    });
+    sel.innerHTML = opts.join('');
+    if(preferredId && __importBatches.some(b=>b.id===preferredId)){
+      sel.value = preferredId;
+    }else if(__importBatches.length){
+      sel.value = __importBatches[0].id;
+    }
+  }catch(e){
+    console.warn('[refreshImportBatchOptions] exception:', e);
+  }
+}
+
+async function getBatchJobIds(batchId){
+  if(!window.sb || !batchId) return [];
+  try{
+    const { data, error } = await window.sb
+      .from('jobs')
+      .select('id')
+      .eq('import_batch_id', batchId);
+    if(error){
+      console.warn('[getBatchJobIds] error:', error);
+      return [];
+    }
+    return (data||[]).map(r=>String(r.id||'')).filter(Boolean);
+  }catch(e){
+    console.warn('[getBatchJobIds] exception:', e);
+    return [];
+  }
+}
+
+function clearOverridesForJobIds(jobIds){
+  if(!Array.isArray(jobIds) || !jobIds.length) return;
+  for(const id of jobIds){
+    const k = 'DB:' + id;
+    delete techOverrides[k];
+    delete plageOverrides[k];
+    delete dateOverrides[k];
+    delete cancelOverrides[k];
+    delete manualLocks[k];
+  }
+  saveOverrides();
+}
+
 async function restoreDbBackup(){
   const b = loadDbBackup();
   if(!b?.rows?.length) return { ok:false, updated:0, failed:0, message:'No backup found' };
@@ -3087,46 +3294,52 @@ async function applyPlanScenario(){
 
 async function resetToImportedData(){
   if(!requireAdminAction()) return;
-  if(!confirm('Reset planner state? If a backup exists, jobs will be restored to pre-apply values. Otherwise fallback is imported UNASSIGNED state.')) return;
-
-  techOverrides = {};
-  plageOverrides = {};
-  dateOverrides = {};
-  cancelOverrides = {};
-  manualLocks = {};
-  saveOverrides();
-  __planScenario = null;
-
-  let restoreMsg = '';
-  if(window.sb && window.IS_ADMIN){
-    const backup = loadDbBackup();
-    if(backup?.rows?.length){
-      const restored = await restoreDbBackup();
-      restoreMsg = `Restored backup: ${restored.updated} rows` + (restored.failed ? `, failed ${restored.failed}` : '');
-      setSyncStatus(`Restored backup at ${syncNowLabel()}`, restored.failed ? 'warn' : 'ok');
-    }else{
-      try{
-        const { error } = await window.sb
-          .from('jobs')
-          .update({ tech_name: 'UNASSIGNED', slot: 'AM', plage: 'AM' })
-          .neq('id', '00000000-0000-0000-0000-000000000000');
-        if(error){
-          console.warn('[resetToImportedData] DB fallback reset error:', error);
-          setSyncStatus('Reset failed (DB error)', 'err');
-        }else{
-          restoreMsg = 'No backup found. Fallback reset to imported UNASSIGNED state.';
-          setSyncStatus(`Fallback reset at ${syncNowLabel()}`, 'warn');
-        }
-      }catch(e){
-        console.warn('[resetToImportedData] DB fallback reset exception:', e);
-      }
-    }
+  if(!window.sb){
+    alert('Database connection required for batch reset.');
+    return;
   }
 
-  await dbBootstrapJobsIntoPayload();
-  rerenderActive();
-  renderScenarioSummaryStrip();
-  alert(restoreMsg || 'Reset complete.');
+  const sel = document.getElementById('resetBatchSelect');
+  const batchId = String(sel?.value || '').trim();
+  if(!batchId){
+    alert('Select an import batch first.');
+    await refreshImportBatchOptions();
+    return;
+  }
+
+  const batch = (__importBatches||[]).find(b=>String(b.id||'')===batchId) || null;
+  const label = batch ? formatImportBatchLabel(batch) : batchId;
+  if(!confirm(`Reset only this import batch?
+
+${label}
+
+Other imported files will stay unchanged.`)) return;
+
+  setSyncStatus('Resetting selected import batch...', 'warn');
+
+  const jobIds = await getBatchJobIds(batchId);
+  try{
+    const { data, error } = await window.sb.rpc('admin_reset_import_batch', { p_batch_id: batchId });
+    if(error){
+      console.warn('[resetToImportedData] rpc error:', error);
+      alert('Batch reset failed. Run migration db/11_import_batches_and_reset.sql and try again.');
+      setSyncStatus('Reset failed', 'err');
+      return;
+    }
+
+    clearOverridesForJobIds(jobIds);
+    __planScenario = null;
+
+    await dbBootstrapJobsIntoPayload();
+    rerenderActive();
+    renderScenarioSummaryStrip();
+    setSyncStatus(`Batch reset complete at ${syncNowLabel()}`, 'ok');
+    alert(`Reset complete for selected batch. Updated rows: ${Number(data||0)}.`);
+  }catch(e){
+    console.warn('[resetToImportedData] exception:', e);
+    setSyncStatus('Reset failed', 'err');
+    alert('Batch reset failed.');
+  }
 }
 
 function exportPlanScenarioCsv(){
@@ -3156,6 +3369,7 @@ document.getElementById('btnPlanOptimize')?.addEventListener('click', ()=>runPla
 document.getElementById('btnPlanCompare')?.addEventListener('click', ()=>{ if(requireAdminAction()) renderPlanScenarioModal(); });
 document.getElementById('btnPlanApply')?.addEventListener('click', applyPlanScenario);
 document.getElementById('btnPlanReset')?.addEventListener('click', resetToImportedData);
+document.getElementById('btnRefreshBatches')?.addEventListener('click', ()=>refreshImportBatchOptions());
 document.getElementById('btnPlanExport')?.addEventListener('click', exportPlanScenarioCsv);
 document.getElementById('btnClosePlanScenario')?.addEventListener('click', closePlanScenarioModal);
 document.getElementById('planScenarioBackdrop')?.addEventListener('click', closePlanScenarioModal);
@@ -4328,7 +4542,10 @@ function buildUIFromPayload(){
   renderKpis();
   wireHandlers();
   highlightMonthsWithFilteredJobs();
-  if(window.IS_ADMIN) setSyncStatus('Idle', 'neutral');
+  if(window.IS_ADMIN){
+    setSyncStatus('Idle', 'neutral');
+    try{ refreshImportBatchOptions(); }catch(e){}
+  }
 }
   
 function setEditModeUI(){
@@ -4346,7 +4563,7 @@ function setEditModeUI(){
     "btnExportJobsCsv", "btnImportJobsCsv",
     "btnExportAllJson", "btnImportAllJson",
     "btnAddJob", "btnManageTechs", "btnToggleMultiTech", "btnToggleAreaRules", "btnManageAreaRules", "btnManageGroups", "syncStatus",
-    "btnPlanGenerate", "btnPlanOptimize", "btnPlanCompare", "btnPlanApply", "btnSyncToDb", "btnPlanReset", "btnPlanExport",
+    "btnPlanGenerate", "btnPlanOptimize", "btnPlanCompare", "btnPlanApply", "btnSyncToDb", "btnPlanReset", "resetBatchSelect", "btnRefreshBatches", "btnPlanExport",
 
     // file inputs for imports
     "fileImportOverrides", "fileImportJobsCsv", "fileImportAll",
