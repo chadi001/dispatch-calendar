@@ -916,6 +916,7 @@ function scheduleSaveOverridesToDB(){
           <button class="reset" id="btnOnsiteInstall" type="button">Onsite install page</button>
           <button class="reset" id="btnExportJobsCsv" type="button">Export jobs CSV</button>
           <button class="reset" id="btnExportManagerCsv" type="button">Export manager report CSV</button>
+          <button class="reset" id="btnExportManagerSummaryCsv" type="button">Export manager summary CSV</button>
           <button class="reset" id="btnExportOverridesJson" type="button">Export overrides JSON</button>
           <button class="reset" id="btnImportOverridesJson" type="button">Import overrides JSON</button>
           <button class="reset" id="btnAddJob" type="button">Add job</button>
@@ -1771,6 +1772,14 @@ function openDrawer(drawer, title, items, iso){
       await refreshAfterExecution();
     };
     actionsS.appendChild(btnStart);
+
+    const btnOnsite = document.createElement('button');
+    btnOnsite.type='button';
+    btnOnsite.className='edbtn secondary';
+    btnOnsite.textContent='Onsite page';
+    btnOnsite.disabled = !dbId;
+    btnOnsite.onclick = ()=>window.open(`onsite-install.html?job_id=${encodeURIComponent(dbId)}`,'_blank');
+    actionsS.appendChild(btnOnsite);
 
     const btnEnd = document.createElement('button');
     btnEnd.type='button';
@@ -2861,10 +2870,87 @@ function exportManagerReportCsv(){
       overdue
     ]);
   }
+  const csv = out.map(r=>r.map(csvEscape).join(',')).join('\n');
+  const tag = (range.mode||'all');
+  downloadText(`manager_report_${payload.year}_${tag}.csv`, csv, 'text/csv;charset=utf-8');
+}
+
+
+function exportManagerSummaryCsv(){
+  rebuildMonthsFromOverrides();
+  const range = getAnalyticsRangeBounds();
+  const baseFilters = { techs:[], region:'ALL', client:'ALL', status:'ALL', groups:[], problemsOnly:false, showCancelled:true };
+  let rows = collectAllItems(baseFilters);
+  rows = filterItemsByAnalyticsRange(rows, range);
+
+  const statusCounts = { scheduled:0, in_progress:0, completed:0, cancelled:0, on_hold:0 };
+  const cancelReasons = {};
+  const completionByTech = {};
+  let delayTotal = 0, delayN = 0;
+  let overdue = 0;
+  const today = dateOnlyIso(new Date().toISOString());
+
+  for(const it of rows){
+    const st = String(it.status || (it._cancelled?'cancelled':'scheduled')).toLowerCase();
+    if(statusCounts[st]===undefined) statusCounts[st]=0;
+    statusCounts[st]++;
+
+    if(st==='cancelled'){
+      const r = String(it.cancel_reason_code || 'unspecified').trim().toLowerCase() || 'unspecified';
+      cancelReasons[r] = (cancelReasons[r]||0)+1;
+    }
+    if(st!=='completed' && st!=='cancelled' && it.iso && it.iso<today) overdue++;
+
+    if(st==='completed' && it.iso && it.actual_end_at){
+      const dPlan = new Date(`${it.iso}T00:00:00`);
+      const dDone = new Date(it.actual_end_at);
+      if(!isNaN(dPlan.getTime()) && !isNaN(dDone.getTime())){
+        delayTotal += Math.round((dDone-dPlan)/86400000);
+        delayN++;
+      }
+    }
+
+    const t = String(it.tech||'UNASSIGNED').trim() || 'UNASSIGNED';
+    if(!completionByTech[t]) completionByTech[t] = { total:0, completed:0 };
+    if(st!=='cancelled'){
+      completionByTech[t].total++;
+      if(st==='completed') completionByTech[t].completed++;
+    }
+  }
+
+  const nonCancelled = rows.length - (statusCounts.cancelled||0);
+  const completionRate = nonCancelled ? Math.round(((statusCounts.completed||0)/nonCancelled)*100) : 0;
+  const avgDelay = delayN ? (delayTotal/delayN).toFixed(1) : '';
+
+  const out=[];
+  out.push(['Section','Key','Value']);
+  out.push(['Meta','Range', range.label]);
+  out.push(['Meta','Rows', String(rows.length)]);
+  out.push(['Status','scheduled', String(statusCounts.scheduled||0)]);
+  out.push(['Status','in_progress', String(statusCounts.in_progress||0)]);
+  out.push(['Status','completed', String(statusCounts.completed||0)]);
+  out.push(['Status','cancelled', String(statusCounts.cancelled||0)]);
+  out.push(['Status','on_hold', String(statusCounts.on_hold||0)]);
+  out.push(['KPI','overdue', String(overdue)]);
+  out.push(['KPI','completion_rate_percent', String(completionRate)]);
+  out.push(['KPI','avg_completion_delay_days', avgDelay || '']);
+
+  for(const [reason,count] of Object.entries(cancelReasons).sort((a,b)=>b[1]-a[1])){
+    out.push(['Cancel reason', reason, String(count)]);
+  }
+  for(const [tech,v] of Object.entries(completionByTech).filter(([t,v])=>t!=='UNASSIGNED' && v.total>0).sort((a,b)=>{
+    const ar = a[1].total ? (a[1].completed/a[1].total) : 0;
+    const br = b[1].total ? (b[1].completed/b[1].total) : 0;
+    return br-ar;
+  })){
+    const pct = v.total ? Math.round((v.completed/v.total)*100) : 0;
+    out.push(['Completion by tech', tech, `${pct}% (${v.completed}/${v.total})`]);
+  }
+
   const csv = out.map(r=>r.map(csvEscape).join(',')).join('
 ');
   const tag = (range.mode||'all');
-  downloadText(`manager_report_${payload.year}_${tag}.csv`, csv, 'text/csv;charset=utf-8');
+  downloadText(`manager_summary_${payload.year}_${tag}.csv`, csv, 'text/csv;charset=utf-8');
 }
 
 function importJobsCsv(file){
@@ -3100,6 +3186,7 @@ function importAllJson(file){
 // Wire buttons
 document.getElementById('btnExportJobsCsv')?.addEventListener('click', exportJobsCsv);
 document.getElementById('btnExportManagerCsv')?.addEventListener('click', exportManagerReportCsv);
+document.getElementById('btnExportManagerSummaryCsv')?.addEventListener('click', exportManagerSummaryCsv);
 document.getElementById('btnImportJobsCsv')?.addEventListener('click', ()=>pickFile('.csv,text/csv', importJobsCsv));
 document.getElementById('btnExportAllJson')?.addEventListener('click', exportAllJson);
 document.getElementById('btnImportAllJson')?.addEventListener('click', ()=>pickFile('.json,application/json', importAllJson));
@@ -5060,7 +5147,7 @@ function setEditModeUI(){
     // import/export/admin tools
     "btnExportMonthCsv", "btnOpenMyMaps",
     "btnExportOverridesJson", "btnImportOverridesJson",
-    "btnExportJobsCsv", "btnExportManagerCsv", "btnImportJobsCsv",
+    "btnExportJobsCsv", "btnExportManagerCsv", "btnExportManagerSummaryCsv", "btnImportJobsCsv",
     "btnExportAllJson", "btnImportAllJson",
     "btnAddJob", "btnManageTechs", "btnToggleMultiTech", "btnToggleAreaRules", "btnManageAreaRules", "btnManageGroups", "syncStatus",
     "btnPlanGenerate", "btnPlanOptimize", "btnPlanCompare", "btnPlanApply", "btnSyncToDb", "btnPlanReset", "resetBatchSelect", "btnRefreshBatches", "btnPlanExport",

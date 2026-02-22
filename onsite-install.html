@@ -39,6 +39,8 @@
     <span id="authStatus" class="small">Not signed in</span>
     <select id="dateMode" style="margin-left:auto"><option value="today">Today</option><option value="all">All dates</option></select>
     <button id="btnReload">Reload</button>
+    <span id="jobFocusInfo" class="small"></span>
+    <a href="index.html" class="small">Back to planner</a>
   </div>
   <div id="jobs" class="grid"></div>
 </div>
@@ -47,6 +49,7 @@ const SUPABASE_URL = 'https://mycgdissxzsizoywcwps.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15Y2dkaXNzeHpzaXpveXdjd3BzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxNzkyNDEsImV4cCI6MjA4NTc1NTI0MX0.1-3qDwNwFeqlHjn-jCACOtV5U2yhgEsQ1yUM-m2TKZg';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:'dispatch-auth-v1'} });
 let me = { user:null, techName:'', isAdmin:false };
+const jobFocusId = new URLSearchParams(location.search).get('job_id') || '';
 
 function todayIso(){ return new Date().toISOString().slice(0,10); }
 function esc(s){ return String(s||'').replace(/[&<>\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
@@ -72,9 +75,10 @@ async function loadJobs(){
   const host=document.getElementById('jobs');
   host.innerHTML='<div class="small">Loading...</div>';
   let q=sb.from('jobs').select('id,job_date,client,site,wo,city,address,plage,tech_name,status,cancelled,cancel_reason_code,actual_start_at,actual_end_at').order('job_date',{ascending:true});
+  if(jobFocusId) q=q.eq('id', jobFocusId);
   if(!me.isAdmin && me.techName) q=q.eq('tech_name', me.techName);
   const dateMode=document.getElementById('dateMode').value;
-  if(dateMode==='today') q=q.eq('job_date', todayIso());
+  if(!jobFocusId && dateMode==='today') q=q.eq('job_date', todayIso());
   const { data, error } = await q;
   if(error){ host.innerHTML='<div class="small">Load failed: '+esc(error.message)+'</div>'; return; }
   if(!data?.length){ host.innerHTML='<div class="small">No jobs.</div>'; return; }
@@ -138,6 +142,10 @@ async function afterSignIn(){
   me.isAdmin = !!adminRow;
   me.techName = await resolveTechName();
   document.getElementById('authStatus').textContent = `Signed in: ${user.email||''} ${me.isAdmin?'(admin)':''} ${me.techName?'- '+me.techName:''}`;
+  const f=document.getElementById('jobFocusInfo');
+  if(f) f.textContent = jobFocusId ? `Focused job: ${jobFocusId}` : '';
+  const dm=document.getElementById('dateMode');
+  if(dm){ dm.disabled = !!jobFocusId; if(jobFocusId) dm.value='all'; }
   document.getElementById('loginForm').style.display='none';
   document.getElementById('btnLogout').style.display='inline-block';
   await loadJobs();
