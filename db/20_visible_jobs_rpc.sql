@@ -55,6 +55,21 @@ set assigned_user_id = coalesce(
 )
 where j.assigned_user_id is null;
 
+update public.job_assignments ja
+set user_id = j.assigned_user_id
+from public.jobs j
+where j.id = ja.job_id
+  and ja.user_id is null
+  and j.assigned_user_id is not null;
+
+update public.jobs j
+set assigned_user_id = ja.user_id
+from public.job_assignments ja
+where ja.job_id = j.id
+  and j.assigned_user_id is null
+  and ja.user_id is not null
+  and coalesce(ja.is_primary, false);
+
 create or replace function public.current_actor_user_ids()
 returns table(user_id uuid)
 language sql
@@ -127,15 +142,25 @@ as $$
            where u.user_id = ja.user_id
          )
      )
-     or exists (
-       select 1
-       from public.current_tech_names() n
-       where lower(btrim(coalesce(j.tech_name, ''))) = lower(btrim(coalesce(n.tech_name, '')))
+     or (
+       j.assigned_user_id is null
+       and not exists (
+         select 1
+         from public.job_assignments ja0
+         where ja0.job_id = j.id
+           and ja0.user_id is not null
+       )
+       and exists (
+         select 1
+         from public.current_tech_names() n
+         where lower(btrim(coalesce(j.tech_name, ''))) = lower(btrim(coalesce(n.tech_name, '')))
+       )
      )
      or exists (
        select 1
        from public.job_assignments ja
        where ja.job_id = j.id
+         and ja.user_id is null
          and exists (
            select 1
            from public.current_tech_names() n
@@ -172,6 +197,17 @@ select
     else 'ok'
   end as assignment_state
 from public.jobs j;
+
+create or replace view public.v_tech_name_collisions as
+select
+  lower(btrim(coalesce(tnm.tech_name, ''))) as tech_key,
+  array_agg(distinct tnm.user_id) as user_ids,
+  count(distinct tnm.user_id) as user_count
+from public.tech_name_map tnm
+where coalesce(tnm.is_active, true)
+  and nullif(btrim(coalesce(tnm.tech_name, '')), '') is not null
+group by lower(btrim(coalesce(tnm.tech_name, '')))
+having count(distinct tnm.user_id) > 1;
 
 grant execute on function public.current_tech_names() to authenticated;
 grant execute on function public.current_actor_user_ids() to authenticated;
