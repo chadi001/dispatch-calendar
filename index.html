@@ -469,7 +469,7 @@ button.reset:hover{background:#f6f8ff;}
     return '';
   }
 
-  async function dbLoadJobs() {
+async function dbLoadJobs() {
   const { data: { user }, error: userErr } = await window.sb.auth.getUser();
   console.log("[dbLoadJobs] user:", user?.id, user?.email, "err:", userErr);
 
@@ -514,21 +514,8 @@ button.reset:hover{background:#f6f8ff;}
   }
 
   const norm = v => String(v||'').trim().toLowerCase();
-  let extraAssigned = new Set();
-  try{
-    const { data: ja, error: jaErr } = await window.sb
-      .from('job_assignments')
-      .select('job_id,tech_name')
-      .eq('tech_name', myTech);
-    if(!jaErr && Array.isArray(ja)){
-      extraAssigned = new Set(ja.map(x=>String(x.job_id||'')).filter(Boolean));
-    }
-  }catch(e){
-    console.warn('[dbLoadJobs] job_assignments fallback err:', e);
-  }
-
-  const filtered = rows.filter(r => norm(r.tech_name) === norm(myTech) || extraAssigned.has(String(r.id||'')));
-  console.log("[dbLoadJobs] TECH mode rows:", rows.length, "mapped tech:", myTech, "via assignments:", extraAssigned.size, "visible:", filtered.length);
+  const filtered = rows.filter(r => norm(r.tech_name) === norm(myTech));
+  console.log("[dbLoadJobs] TECH mode rows:", rows.length, "mapped tech:", myTech, "visible:", filtered.length);
   return filtered;
 } // ✅ CLOSE dbLoadJobs()
 
@@ -5136,6 +5123,30 @@ async function initApp(){
   try{ __dbBootstrap = false; }catch(e){}
 }
 
+async function syncOverridePackForSignedInSession(){
+  try{ __dbBootstrap = true; }catch(e){}
+  try{
+    const pack = await dbLoadOverridePack();
+    if(pack){
+      techOverrides   = pack.tech_overrides   || {};
+      plageOverrides  = pack.plage_overrides  || {};
+      dateOverrides   = pack.date_overrides   || {};
+      cancelOverrides = pack.cancel_overrides || {};
+      manualLocks     = pack.manual_locks     || {};
+    }else{
+      techOverrides = {};
+      plageOverrides = {};
+      dateOverrides = {};
+      cancelOverrides = {};
+      manualLocks = {};
+    }
+    saveOverrides();
+  }catch(e){
+    console.warn('syncOverridePackForSignedInSession failed:', e);
+  }
+  try{ __dbBootstrap = false; }catch(e){}
+}
+
 
 // Start (never blank)
 initApp().catch(err=>{
@@ -5272,6 +5283,7 @@ async function doLogin(e) {
     }
     
     __enterDbModeClean();
+    await syncOverridePackForSignedInSession();
 
 try {
   await refreshTechProfileRules();
@@ -5323,6 +5335,7 @@ if (window.paintBuildBadge) window.paintBuildBadge();
       $("authStatus").textContent += " | Schema warning";
     }
     __enterDbModeClean();                      // ✅ ADD (recommended for consistency)
+    await syncOverridePackForSignedInSession();
 
     try {
       await refreshTechProfileRules();
