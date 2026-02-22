@@ -3982,12 +3982,15 @@ async function syncToDatabase(options={}){
     try{
       const normalizedTech = String(u.tech_name||'').trim();
       const isUnassigned = normalizedTech.toUpperCase() === 'UNASSIGNED';
-      const assignedUserId = isUnassigned ? null : (techUserMap[normalizedTech.toLowerCase()] || null);
-      if(!isUnassigned && !assignedUserId) missingUserMap.add(normalizedTech);
+      const canonicalTech = isUnassigned ? 'UNASSIGNED' : (normalizeTechName(normalizedTech) || normalizedTech);
+      const assignedUserId = isUnassigned
+        ? null
+        : (techUserMap[canonicalTech.toLowerCase()] || techUserMap[normalizedTech.toLowerCase()] || null);
+      if(!isUnassigned && !assignedUserId) missingUserMap.add(canonicalTech);
       const { error } = await window.sb
         .from('jobs')
         .update({
-          tech_name: u.tech_name,
+          tech_name: canonicalTech,
           assigned_user_id: assignedUserId,
           slot: u.slot,
           plage: u.plage,
