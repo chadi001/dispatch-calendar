@@ -136,6 +136,11 @@ as $$
        select 1
        from public.job_assignments ja
        where ja.job_id = j.id
+         and (
+           coalesce(ja.is_primary, false)
+           or lower(btrim(coalesce(ja.role, ''))) = 'lead'
+           or lower(btrim(coalesce(ja.tech_name, ''))) = lower(btrim(coalesce(j.tech_name, '')))
+         )
          and exists (
            select 1
            from public.current_actor_user_ids() u
@@ -161,6 +166,11 @@ as $$
        from public.job_assignments ja
        where ja.job_id = j.id
          and ja.user_id is null
+         and (
+           coalesce(ja.is_primary, false)
+           or lower(btrim(coalesce(ja.role, ''))) = 'lead'
+           or lower(btrim(coalesce(ja.tech_name, ''))) = lower(btrim(coalesce(j.tech_name, '')))
+         )
          and exists (
            select 1
            from public.current_tech_names() n
