@@ -18,12 +18,15 @@
 .edbtn{padding:6px 10px;border-radius:10px;border:1px solid #e5e7eb;background:#fff;cursor:pointer}
 .edbtn.secondary{background:#f9fafb}
 
-body{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:18px;color:#111;}
+body{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:14px;color:#111;background:#f7f8fa;}
 .small{color:#555;font-size:13px;line-height:1.35;}
 h2{margin:0 0 6px 0;}
 .topHero{display:grid;grid-template-columns:1fr minmax(320px,420px);gap:14px;align-items:start;margin-bottom:10px}
 .heroQuote{border-left:4px solid #0f766e;background:#f7fcfb;padding:10px 12px;border-radius:10px;color:#374151}
 .heroQuote b{color:#0f172a}
+.navQuick{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0 0 0}
+.navBtn{display:inline-flex;align-items:center;gap:6px;border:1px solid #d1d5db;background:#fff;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:700;color:#1f2937;text-decoration:none}
+.navBtn:hover{background:#eef2ff;border-color:#b6c6ff}
 .toolbar{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:12px;align-items:start;margin:12px 0 14px 0;max-width:1400px}
 .toolbarMain{display:flex;gap:12px;flex-wrap:wrap;align-items:end}
 .toolbarSide{display:flex;flex-direction:column;gap:8px}
@@ -760,6 +763,10 @@ function scheduleSaveOverridesToDB(){
       HQ: <b>4741 Boulevard des Laurentides #204, Laval, Quebec H7K 2Z6</b><br/>
       Dispatch baseline: priority <b>Adil</b> then <b>Abdel</b>, capacity <b>1 AM + 1 PM</b> per tech/day.
     </div>
+    <div class="navQuick">
+      <a class="navBtn" href="dashboard.html" target="_blank" id="btnOpenDashboard">Open KPI dashboard</a>
+      <a class="navBtn" href="onsite-install.html" target="_blank" id="btnOpenOnsiteStandalone">Open onsite workflow</a>
+    </div>
   </div>
 
   <div id="authBox" class="authCard">
@@ -850,7 +857,7 @@ function scheduleSaveOverridesToDB(){
 
 
 
-<div class="kpiLayout">
+<div class="kpiLayout" id="kpiLayout">
   <div class="kpiMain">
 <div class="kpiWrap" id="kpiWrap">
   <div class="kpiHead">
@@ -954,6 +961,7 @@ function scheduleSaveOverridesToDB(){
 </div>
 </div>
 
+<div id="techViewHint" class="small" style="display:none;margin:8px 0 10px 0;padding:8px 10px;border:1px solid #dbeafe;background:#eff6ff;border-radius:10px;">Tech view: focused on calendar operations. KPI dashboard is available from the top button.</div>
 <div class="tabs" id="tabs"></div>
 <div id="content"></div>
 
@@ -5196,6 +5204,11 @@ function setEditModeUI(){
     el.style.pointerEvents = canEdit ? "auto" : "none";
     if(!canEdit) el.title = "Admin only";
   });
+
+  const kpiLayout = document.getElementById('kpiLayout');
+  if(kpiLayout) kpiLayout.style.display = isAdmin ? '' : 'none';
+  const techHint = document.getElementById('techViewHint');
+  if(techHint) techHint.style.display = isAdmin ? 'none' : '';
 }
 
 
