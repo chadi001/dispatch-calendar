@@ -312,6 +312,7 @@ button.reset:hover{background:#f6f8ff;}
       site: ['site','prov_site','site_id','site_name'],
       workOrder: ['wo','work_order','order_number'],
       city: ['region','city','admin_region'],
+      postal: ['postal_code','postal','zip','zip_code'],
       address: ['destination_display','full_address','destination','street_address','address'],
       mapUrl: ['map_url_display','map_url','google_maps_link','url']
     }
@@ -632,11 +633,11 @@ function resetCalendarKeepShape(){
 
 
 function jobRowToPayloadItem(r){
+  const rawPostal = String(pickField(r, APP_META.jobsCanonical.postal, '') || '').trim();
   const dest = String(pickField(r, APP_META.jobsCanonical.address, '') || '').trim() ||
-    [r.address, r.city, r.province, r.postal_code].filter(Boolean).join(', ').trim();
-  const normalizedPostal = normalizePostalCode(r.postal_code || '') || extractPostalCode(dest);
-
+    [r.address, r.city, r.province, rawPostal].filter(Boolean).join(', ').trim();
   const mapUrl = String(pickField(r, APP_META.jobsCanonical.mapUrl, '') || '').trim();
+  const normalizedPostal = normalizePostalCode(rawPostal) || extractPostalCode(dest) || extractPostalFromMapUrl(mapUrl);
 
   const workOrder = String(pickField(r, APP_META.jobsCanonical.workOrder, '') || '').trim();
   const siteValue = String(pickField(r, APP_META.jobsCanonical.site, '') || '').trim();
@@ -1555,12 +1556,28 @@ function normalizePostalCode(text){
   if(!m) return '';
   return `${m[1]} ${m[2]}`;
 }
+function extractPostalFromMapUrl(url){
+  const raw = String(url||'').trim();
+  if(!raw) return '';
+  try{
+    const u = new URL(raw);
+    const values = [];
+    u.searchParams.forEach(v=>values.push(v));
+    const blob = values.join(' ');
+    const decoded = decodeURIComponent(blob.replace(/\+/g,' '));
+    return normalizePostalCode(decoded);
+  }catch(e){
+    try{ return normalizePostalCode(decodeURIComponent(raw.replace(/\+/g,' '))); }catch(err){ return ''; }
+  }
+}
 function extractPostalCode(text){
   return normalizePostalCode(text);
 }
 function getPostalForItem(it){
   const direct = normalizePostalCode(it?.postal_code || '');
   if(direct) return direct;
+  const mapPostal = extractPostalFromMapUrl(it?.url || it?.map_url || '');
+  if(mapPostal) return mapPostal;
   const joined = [
     it?.destination,
     it?.address,
@@ -2885,6 +2902,7 @@ function importJobsCsv(file){
     const iProv=idx("Province");
     const iCity=idx("City");
     const iAddr=idx("Address");
+    const iPostal=(idx("Postal Code")>=0 ? idx("Postal Code") : (idx("Postal")>=0 ? idx("Postal") : idx("Zip")));
     const iDate=idx("Date Scheduled");
     const iTime=idx("Start Time");
     const iTech=idx("Tech Assigned");
@@ -2899,11 +2917,12 @@ function importJobsCsv(file){
 
       const city=(row[iCity]||'').trim();
       const addr=(row[iAddr]||'').trim();
+      const postal=(iPostal>=0 ? (row[iPostal]||'').trim() : '');
       const province=(row[iProv]||'').trim();
       const site=(row[iSite]||'').trim();
       const wo=(row[iWO]||'').trim();
       const client=(row[iClient]||'').trim();
-      const destination = [addr, city, province].filter(Boolean).join(', ');
+      const destination = [addr, city, province, postal].filter(Boolean).join(', ');
       const region = city || (site||'').split('-')[0] || 'Unknown';
 
       const rawLink = (row[iLink]||'').trim();
@@ -2913,7 +2932,7 @@ function importJobsCsv(file){
       let tech=normalizeTechName(row[iTech]);
       let plage='';
 
-      const cand = { region, client, raw:{city, address: addr}, destination };
+      const cand = { region, client, raw:{city, address: addr, postal_code: postal}, destination };
 
       if(!rawTime){
         if(tech && TECHS.includes(tech) && tech!=='UNASSIGNED'){
@@ -2946,11 +2965,11 @@ function importJobsCsv(file){
         url,
         destination,
         unassigned: tech==='UNASSIGNED',
-        raw: {city, address: addr, prov_site: site, order_number: wo, work_order: wo}
+        raw: {city, address: addr, postal_code: postal, prov_site: site, order_number: wo, work_order: wo}
       };
 
       addJobToBaseMonths(job, iso);
-      records.push({ iso, job, city, address: addr, province, site, wo, client });
+      records.push({ iso, job, city, address: addr, postal_code: postal, province, site, wo, client });
       added++;
       if(job.unassigned) unassigned++;
     }
@@ -2997,6 +3016,7 @@ function importJobsCsv(file){
       province: rec.province || null,
       city: rec.city || null,
       address: rec.address || null,
+      postal_code: (normalizePostalCode(rec.postal_code || '') || null),
       slot: (rec.job.plage==='PM'?'PM':'AM'),
       plage: (rec.job.plage==='PM'?'PM':'AM'),
       tech_name: rec.job.tech || 'UNASSIGNED',
