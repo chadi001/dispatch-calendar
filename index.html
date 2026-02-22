@@ -673,6 +673,14 @@ function jobRowToPayloadItem(r){
 async function dbBootstrapJobsIntoPayload(){
   const rows = await dbLoadJobs();
   __jobAssignmentsMap = await dbLoadAssignmentsMap();
+  const discoveredTechs = [];
+  for(const r of (rows||[])){
+    discoveredTechs.push(pickField(r, APP_META.jobsCanonical.tech, ''));
+  }
+  for(const arr of Object.values(__jobAssignmentsMap||{})){
+    if(Array.isArray(arr)) discoveredTechs.push(...arr);
+  }
+  mergeTechCatalog(discoveredTechs);
 
   // DB is the ONLY source of jobs -> rebuild base months from a clean template
   if(!window.payload || !payload.__monthTemplate){
@@ -1197,10 +1205,52 @@ if(!payload.__monthTemplate){
 }
 
 const techColors = payload.tech_colors;
-const TECHS = ["Adil","Abdel","Chadi","Tech A","Tech B","UNASSIGNED"];
+let TECHS = ["Adil","Abdel","Chadi","Tech A","Tech B","UNASSIGNED"];
 // Auto-fill priority (today we optimize only for Adil then Abdel)
-const AUTO_PRIORITY = ["Adil","Abdel","Chadi","Tech A","Tech B"];
+let AUTO_PRIORITY = ["Adil","Abdel","Chadi","Tech A","Tech B"];
 let TECH_PROFILE_RULES = {};
+
+function normalizeTechLabel(v){
+  return String(v||'').trim();
+}
+
+function uniqTechNames(items){
+  const seen = new Set();
+  const out = [];
+  for(const raw of (items||[])){
+    const name = normalizeTechLabel(raw);
+    if(!name) continue;
+    const key = name.toLowerCase();
+    if(seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
+  }
+  return out;
+}
+
+function applyTechCatalog(names){
+  const clean = uniqTechNames(names).filter(t=>t.toUpperCase()!=='UNASSIGNED');
+  TECHS = clean.concat(['UNASSIGNED']);
+  const preferred = ['Adil','Abdel','Chadi'];
+  const extras = TECHS.filter(t=>t!=='UNASSIGNED' && !preferred.includes(t));
+  AUTO_PRIORITY = preferred.filter(t=>TECHS.includes(t)).concat(extras);
+  ensureTechColors();
+}
+
+function mergeTechCatalog(extraNames){
+  const fromProfiles = Object.keys(TECH_PROFILE_RULES||{});
+  const fromPayload = [];
+  for(const mid of Object.keys(payload.months||{})){
+    const m = payload.months[mid];
+    for(const iso of Object.keys(m?.date_index||{})){
+      for(const it of (m.date_index[iso]||[])){
+        fromPayload.push(it?.tech);
+        if(Array.isArray(it?.additional_techs)) fromPayload.push(...it.additional_techs);
+      }
+    }
+  }
+  applyTechCatalog([...(TECHS||[]), ...fromProfiles, ...(extraNames||[]), ...fromPayload, 'UNASSIGNED']);
+}
 
 function normalizeClientCode(client){
   const c = String(client||'').trim().toUpperCase();
@@ -1280,9 +1330,11 @@ async function refreshTechProfileRules(){
       };
     }
     TECH_PROFILE_RULES = map;
+    mergeTechCatalog(Object.keys(map));
   }catch(e){
     console.warn('[refreshTechProfileRules] exception:', e);
     TECH_PROFILE_RULES = {};
+    mergeTechCatalog([]);
   }
 }
 
@@ -1292,7 +1344,7 @@ function normalizeTechName(t){
   // legacy compatibility
   if(s==='Tech A') return 'Adil';
   if(s==='Tech B') return 'Abdel';
-  return "";
+  return s;
 }
 function ensureTechColors(){
   if(!payload.tech_colors) payload.tech_colors = {};
@@ -1493,12 +1545,13 @@ function normalizeDisplayItem(it, iso){
     teamJob,
     groupName: g ? g.name : '',
     groupColor: g ? g.color : '',
-    unassigned: isUnassignedTech(tech) && !teamJob,
+    unassigned: isUnassignedTech(tech),
     status,
     _cancelled: status === 'cancelled' || (!!it.cancelled) || !!cancelOverrides[k]
   };
 }
 function matchFilters(it, filters){
+  if(!window.IS_ADMIN && !canExecuteJobItem(it)) return false;
   if(!filters.showCancelled && it._cancelled) return false;
   if(filters.techs.length>0 && !filters.techs.includes(it.tech)) return false;
   if(filters.region!=="ALL" && (it.adminRegion||inferAdminRegion(it.region))!==filters.region) return false;
@@ -2134,6 +2187,16 @@ function makePanel(mid, m){
 
         a.addEventListener('click',(ev)=>{
           if(ev.button===0 && !ev.ctrlKey && !ev.metaKey){
+            if(ev.shiftKey){
+              ev.preventDefault();
+              clearSelected(panel);
+              a.classList.add('selected');
+              openDrawer(drawer, `Jobs for ${iso} (${items.length})`, items, iso);
+              drawer.scrollIntoView({behavior:'smooth', block:'start'});
+              return;
+            }
+            // Default click opens HQ -> destination route in Maps.
+            if(route && route !== '#') return;
             ev.preventDefault();
             clearSelected(panel);
             a.classList.add('selected');
@@ -3970,7 +4033,7 @@ function closeManageTeamModal(){
 function renderManageTeam(){
   const host=document.getElementById('manageTechsList');
   if(!host) return;
-  const techOpts=['','Adil','Abdel','Chadi','Tech A','Tech B'].map(t=>`<option value="${t}">${t||'-- Unmapped --'}</option>`).join('');
+  const techOpts=[''].concat(TECHS.filter(t=>t!=='UNASSIGNED')).map(t=>`<option value="${t}">${t||'-- Unmapped --'}</option>`).join('');
 
   if(!__teamRows.length){
     host.innerHTML='<div class="small">No users found.</div>';
@@ -4960,9 +5023,9 @@ function rebuildMonthsFromOverrides(){
         if(ovPlage) it.plage = ovPlage;
         if(ovTech){
           it.tech = ovTech;
-          it.unassigned = (ovTech === 'UNASSIGNED') && !((Array.isArray(it.additional_techs)?it.additional_techs.length:0)>0);
+          it.unassigned = (ovTech === 'UNASSIGNED');
         }else{
-          it.unassigned = (it.tech === 'UNASSIGNED') && !((Array.isArray(it.additional_techs)?it.additional_techs.length:0)>0);
+          it.unassigned = (it.tech === 'UNASSIGNED');
         }
         // keep label in sync
         it.label = `${it.plage} | ${it.tech} | ${it.site||''} | ${it.wo||''}`;
@@ -5062,9 +5125,6 @@ function setEditModeUI(){
 
   // ---- Hide entire admin-only controls ----
   const hideIds = [
-    // tech selection area
-    "techAll", "techClear", "techChecks",
-
     // import/export/admin tools
     "btnExportMonthCsv", "btnOpenMyMaps",
     "btnExportOverridesJson", "btnImportOverridesJson",
