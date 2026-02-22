@@ -514,8 +514,21 @@ async function dbLoadJobs() {
   }
 
   const norm = v => String(v||'').trim().toLowerCase();
-  const filtered = rows.filter(r => norm(r.tech_name) === norm(myTech));
-  console.log("[dbLoadJobs] TECH mode rows:", rows.length, "mapped tech:", myTech, "visible:", filtered.length);
+  let extraAssigned = new Set();
+  try{
+    const { data: ja, error: jaErr } = await window.sb
+      .from('job_assignments')
+      .select('job_id,tech_name')
+      .eq('tech_name', myTech);
+    if(!jaErr && Array.isArray(ja)){
+      extraAssigned = new Set(ja.map(x=>String(x.job_id||'')).filter(Boolean));
+    }
+  }catch(e){
+    console.warn('[dbLoadJobs] job_assignments fallback err:', e);
+  }
+
+  const filtered = rows.filter(r => norm(r.tech_name) === norm(myTech) || extraAssigned.has(String(r.id||'')));
+  console.log("[dbLoadJobs] TECH mode rows:", rows.length, "mapped tech:", myTech, "via assignments:", extraAssigned.size, "visible:", filtered.length);
   return filtered;
 } // ✅ CLOSE dbLoadJobs()
 
@@ -5126,6 +5139,15 @@ async function initApp(){
 async function syncOverridePackForSignedInSession(){
   try{ __dbBootstrap = true; }catch(e){}
   try{
+    if(!window.IS_ADMIN){
+      techOverrides = {};
+      plageOverrides = {};
+      dateOverrides = {};
+      cancelOverrides = {};
+      manualLocks = {};
+      saveOverrides();
+      return;
+    }
     const pack = await dbLoadOverridePack();
     if(pack){
       techOverrides   = pack.tech_overrides   || {};
