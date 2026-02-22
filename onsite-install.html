@@ -60,6 +60,7 @@ function todayIso(){ return new Date().toISOString().slice(0,10); }
 function esc(s){ return String(s||'').replace(/[&<>\"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m])); }
 function statusClass(s){ s=String(s||'scheduled').toLowerCase(); return ['scheduled','in_progress','completed','cancelled'].includes(s)?s:'scheduled'; }
 async function rpc(fn, args){ const { error } = await sb.rpc(fn, args||{}); return { ok:!error, error:error?.message||'' }; }
+function postal(text){ const s=String(text||'').toUpperCase(); const m=s.match(/\b([A-Z]\d[A-Z])[ -]?(\d[A-Z]\d)\b/); return m?`${m[1]} ${m[2]}`:''; }
 
 async function resolveTechName(){
   try{ const { data } = await sb.rpc('current_tech_name'); if(data) return String(data).trim(); }catch(e){}
@@ -103,7 +104,7 @@ function buildChecklistHtml(ck){
 async function loadJobs(){
   const host=document.getElementById('jobs');
   host.innerHTML='<div class="small">Loading...</div>';
-  let q=sb.from('jobs').select('id,job_date,client,site,wo,city,address,plage,tech_name,status,cancelled,cancel_reason_code,actual_start_at,actual_end_at').order('job_date',{ascending:true});
+  let q=sb.from('jobs').select('id,job_date,client,site,wo,city,address,postal_code,plage,tech_name,status,cancelled,cancel_reason_code,actual_start_at,actual_end_at').order('job_date',{ascending:true});
   if(jobFocusId) q=q.eq('id', jobFocusId);
   if(!me.isAdmin && me.techName) q=q.eq('tech_name', me.techName);
   const dateMode=document.getElementById('dateMode').value;
@@ -116,6 +117,7 @@ async function loadJobs(){
     const card=document.createElement('div');
     card.className='job';
     const status=(j.status||(j.cancelled?'cancelled':'scheduled')).toLowerCase();
+    const showPostal = postal(j.postal_code || j.address || '');
     const ck=await loadChecklist(j.id);
     const ckHtml = buildChecklistHtml(ck);
     card.innerHTML=`
@@ -124,6 +126,7 @@ async function loadJobs(){
         <span class="badge ${statusClass(status)}">${esc(status.replace('_',' ').toUpperCase())}</span>
       </div>
       <div class="small">${esc(j.job_date||'')} ${esc(j.plage||'')} | ${esc(j.tech_name||'')} | ${esc(j.city||'')}</div>
+      ${showPostal?`<div class="small">Postal: <b>${esc(showPostal)}</b></div>`:''}
       <div class="small">${esc(j.address||'')}</div>
       <div class="small">Start: ${esc(j.actual_start_at||'-')} | End: ${esc(j.actual_end_at||'-')}</div>
       ${j.cancel_reason_code?`<div class="small">Cancel reason: ${esc(j.cancel_reason_code)}</div>`:''}

@@ -419,7 +419,7 @@ button.reset:hover{background:#f6f8ff;}
   async function dbValidateRuntimeSchema(){
     if(!window.sb) return { ok:false, missing:['supabase_client'] };
     const checks = [
-      { table:'jobs', cols:'id,job_date,tech_name,slot,plage,wo,order_number,site,prov_site,city,address,client,cancelled,manual_lock,status,cancel_reason_code,cancel_reason_note,actual_start_at,actual_end_at' },
+      { table:'jobs', cols:'id,job_date,tech_name,slot,plage,wo,order_number,site,prov_site,city,address,postal_code,client,cancelled,manual_lock,status,cancel_reason_code,cancel_reason_note,actual_start_at,actual_end_at' },
       { table:'admin_users', cols:'user_id' },
       { table:'tech_profiles', cols:'user_id,display_name,tech_code,is_active,priority_rank,specialties' },
       { table:'tech_name_map', cols:'user_id,tech_name,is_active' },
@@ -631,6 +631,7 @@ function resetCalendarKeepShape(){
 function jobRowToPayloadItem(r){
   const dest = String(pickField(r, APP_META.jobsCanonical.address, '') || '').trim() ||
     [r.address, r.city, r.province, r.postal_code].filter(Boolean).join(', ').trim();
+  const normalizedPostal = normalizePostalCode(r.postal_code || '') || extractPostalCode(dest);
 
   const mapUrl = String(pickField(r, APP_META.jobsCanonical.mapUrl, '') || '').trim();
 
@@ -643,9 +644,11 @@ function jobRowToPayloadItem(r){
     site_id: r.site_id || r.site || r.prov_site || '',
     wo: workOrder,
     province: r.province || '',
+    address: r.address || '',
+    city: r.city || '',
     region: String(pickField(r, APP_META.jobsCanonical.city, '') || ''),
     destination: dest,
-    postal_code: r.postal_code || '',
+    postal_code: normalizedPostal,
     url: mapUrl,
     plage: String(pickField(r, APP_META.jobsCanonical.slot, 'AM') || 'AM'),
     tech: String(pickField(r, APP_META.jobsCanonical.tech, 'UNASSIGNED') || 'UNASSIGNED'),
@@ -1557,11 +1560,20 @@ function statusChipText(status){
 }
 
 function plageSort(p){ return p==="AM"?0:(p==="PM"?1:2); }
-function extractPostalCode(text){
-  const s = String(text||'');
-  const m = s.match(/\b([A-Za-z]\d[A-Za-z])[ -]?(\d[A-Za-z]\d)\b/);
+function normalizePostalCode(text){
+  const s = String(text||'').toUpperCase();
+  const m = s.match(/\b([A-Z]\d[A-Z])[ -]?(\d[A-Z]\d)\b/);
   if(!m) return '';
-  return `${m[1].toUpperCase()} ${m[2].toUpperCase()}`;
+  return `${m[1]} ${m[2]}`;
+}
+function extractPostalCode(text){
+  return normalizePostalCode(text);
+}
+function getPostalForItem(it){
+  const direct = normalizePostalCode(it?.postal_code || '');
+  if(direct) return direct;
+  const joined = [it?.destination, it?.address, it?.city, it?.region, it?.province].filter(Boolean).join(' ');
+  return extractPostalCode(joined);
 }
 
 function itemsForDate(m, iso, filters){
@@ -1654,7 +1666,7 @@ function openDrawer(drawer, title, items, iso){
       line1.appendChild(el('span',{class:'small',title:'Group'}, '['+it.groupName+']'));
     }
     line1.appendChild(el('span',{class:'small'},it.region||''));
-    const drawerPostal = (it.postal_code || extractPostalCode(it.destination || '') || '').trim();
+    const drawerPostal = getPostalForItem(it);
     if(drawerPostal) line1.appendChild(el('span',{class:'postalTag',title:'Postal code'},drawerPostal));
     line1.appendChild(el('span',{},it.site||''));
     line1.appendChild(el('span',{class:'small'},it.wo||''));
@@ -2066,7 +2078,7 @@ function makePanel(mid, m){
 
         a.appendChild(el('div',{class:'daynum'},String(d)));
         if(cnt>0) a.appendChild(el('div',{class:'count'},String(cnt)));
-        const cellPostal = items.map(x => (x.postal_code || extractPostalCode(x.destination || '') || '').trim()).filter(Boolean);
+        const cellPostal = items.map(x => getPostalForItem(x)).filter(Boolean);
         if(cellPostal.length){
           const uniquePostal = Array.from(new Set(cellPostal));
           const ptxt = uniquePostal.length>1 ? `${uniquePostal[0]} +${uniquePostal.length-1}` : uniquePostal[0];
@@ -2181,7 +2193,7 @@ function makePanel(mid, m){
             tt.style.background = techColors[it.tech] || '#777';
             const c = (it.client||'').trim().toUpperCase();
             const ct = el('span',{class:'clientTag ' + (c==='GOCO' || c==='COGO' ? 'goco' : (c==='MCN' ? 'mcn' : 'unk'))}, c || '—');
-            const weeklyPostal = (it.postal_code || extractPostalCode(it.destination || '') || '').trim();
+            const weeklyPostal = getPostalForItem(it);
             const idTxt = (it.wo && String(it.wo).trim()) ? `WO ${String(it.wo).trim()}` : ((it.site && String(it.site).trim()) ? `Site ${String(it.site).trim()}` : '');
             const extraNames = Array.isArray(it.additional_techs) ? it.additional_techs : [];
             const extraN = extraNames.length;
