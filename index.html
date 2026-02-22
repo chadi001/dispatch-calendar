@@ -448,25 +448,34 @@ button.reset:hover{background:#f6f8ff;}
 
 
   window.CURRENT_TECH_NAME = window.CURRENT_TECH_NAME || '';
+  window.CURRENT_TECH_NAMES = Array.isArray(window.CURRENT_TECH_NAMES) ? window.CURRENT_TECH_NAMES : [];
 
-  async function dbResolveCurrentTechName(user){
-    if(!window.sb) return '';
+  async function dbResolveCurrentTechNames(user){
+    if(!window.sb) return [];
+    const out = [];
+    const add = (v)=>{
+      const s = String(v||'').trim();
+      if(!s) return;
+      if(!out.some(x=>x.toLowerCase()===s.toLowerCase())) out.push(s);
+    };
     try{
       const { data: techName, error: fnErr } = await window.sb.rpc('current_tech_name');
-      if(!fnErr && typeof techName === 'string' && String(techName).trim()) return String(techName).trim();
+      if(!fnErr && typeof techName === 'string') add(techName);
     }catch(e){}
     try{
       const uid = user?.id || (await window.sb.auth.getUser())?.data?.user?.id;
-      if(!uid) return '';
-      const { data: mapRow, error: mapErr } = await window.sb
-        .from('tech_name_map')
-        .select('tech_name')
-        .eq('user_id', uid)
-        .eq('is_active', true)
-        .maybeSingle();
-      if(!mapErr && mapRow?.tech_name) return String(mapRow.tech_name).trim();
+      if(uid){
+        const { data: mapRows, error: mapErr } = await window.sb
+          .from('tech_name_map')
+          .select('tech_name')
+          .eq('user_id', uid)
+          .eq('is_active', true);
+        if(!mapErr && Array.isArray(mapRows)){
+          mapRows.forEach(r=>add(r?.tech_name));
+        }
+      }
     }catch(e){}
-    return '';
+    return out;
   }
 
 async function dbLoadJobs() {
@@ -498,8 +507,9 @@ async function dbLoadJobs() {
   }
 
   // 2) Tech users: RLS first + local safeguard filter by mapped tech
-  const myTech = await dbResolveCurrentTechName(user);
-  window.CURRENT_TECH_NAME = myTech || '';
+  const myTechs = await dbResolveCurrentTechNames(user);
+  window.CURRENT_TECH_NAMES = myTechs;
+  window.CURRENT_TECH_NAME = myTechs[0] || '';
 
   const { data, error } = await window.sb
     .from("jobs")
@@ -508,18 +518,32 @@ async function dbLoadJobs() {
   if (error) throw error;
 
   const rows = data || [];
-  if(!myTech){
+  if(!myTechs.length){
     console.warn('[dbLoadJobs] no mapping resolved; returning empty for safety');
     return [];
   }
 
   const norm = v => String(v||'').trim().toLowerCase();
+  const techSet = new Set(myTechs.map(norm));
   let extraAssigned = new Set();
   try{
-    const { data: ja, error: jaErr } = await window.sb
-      .from('job_assignments')
-      .select('job_id,tech_name')
-      .eq('tech_name', myTech);
+    let ja = [];
+    let jaErr = null;
+    try{
+      const res = await window.sb
+        .from('job_assignments')
+        .select('job_id,tech_name')
+        .in('tech_name', myTechs);
+      ja = res.data || [];
+      jaErr = res.error || null;
+    }catch(e){
+      const collected = [];
+      for(const t of myTechs){
+        const one = await window.sb.from('job_assignments').select('job_id,tech_name').eq('tech_name', t);
+        if(!one.error && Array.isArray(one.data)) collected.push(...one.data);
+      }
+      ja = collected;
+    }
     if(!jaErr && Array.isArray(ja)){
       extraAssigned = new Set(ja.map(x=>String(x.job_id||'')).filter(Boolean));
     }
@@ -527,8 +551,8 @@ async function dbLoadJobs() {
     console.warn('[dbLoadJobs] job_assignments fallback err:', e);
   }
 
-  const filtered = rows.filter(r => norm(r.tech_name) === norm(myTech) || extraAssigned.has(String(r.id||'')));
-  console.log("[dbLoadJobs] TECH mode rows:", rows.length, "mapped tech:", myTech, "via assignments:", extraAssigned.size, "visible:", filtered.length);
+  const filtered = rows.filter(r => techSet.has(norm(r.tech_name)) || extraAssigned.has(String(r.id||'')));
+  console.log("[dbLoadJobs] TECH mode rows:", rows.length, "mapped techs:", myTechs.join(', '), "via assignments:", extraAssigned.size, "visible:", filtered.length);
   return filtered;
 } // ✅ CLOSE dbLoadJobs()
 
@@ -1517,11 +1541,11 @@ function matchFilters(it, filters){
 
 function canExecuteJobItem(it){
   if(window.IS_ADMIN) return true;
-  const me = String(window.CURRENT_TECH_NAME || '').trim().toLowerCase();
-  if(!me) return false;
-  if(String(it.tech||'').trim().toLowerCase() === me) return true;
+  const meSet = new Set((Array.isArray(window.CURRENT_TECH_NAMES) ? window.CURRENT_TECH_NAMES : [window.CURRENT_TECH_NAME]).map(v=>String(v||'').trim().toLowerCase()).filter(Boolean));
+  if(!meSet.size) return false;
+  if(meSet.has(String(it.tech||'').trim().toLowerCase())) return true;
   const extra = Array.isArray(it.additional_techs) ? it.additional_techs : [];
-  return extra.some(t => String(t||'').trim().toLowerCase() === me);
+  return extra.some(t => meSet.has(String(t||'').trim().toLowerCase()));
 }
 
 function fmtDateTime(v){
@@ -5295,9 +5319,10 @@ async function doLogin(e) {
 
     window.USE_DB_JOBS = true;                 // ✅ ADD
     window.IS_ADMIN = await dbIsAdmin();       // ✅ ADD (must be AFTER sign-in)
-    window.CURRENT_TECH_NAME = await dbResolveCurrentTechName();
+    window.CURRENT_TECH_NAMES = await dbResolveCurrentTechNames();
+    window.CURRENT_TECH_NAME = (window.CURRENT_TECH_NAMES[0] || '');
     window.CAN_EDIT = window.IS_ADMIN;
-    window.CAN_EXECUTE = window.IS_ADMIN || !!window.CURRENT_TECH_NAME;
+    window.CAN_EXECUTE = window.IS_ADMIN || window.CURRENT_TECH_NAMES.length>0;
     const schema = await dbValidateRuntimeSchema();
     if(!schema.ok && window.IS_ADMIN){
       console.warn('[schema] runtime schema mismatch:', schema.missing);
@@ -5348,9 +5373,10 @@ if (window.paintBuildBadge) window.paintBuildBadge();
 
     window.USE_DB_JOBS = true;
     window.IS_ADMIN = await dbIsAdmin();       // ✅ ADD
-    window.CURRENT_TECH_NAME = await dbResolveCurrentTechName();
+    window.CURRENT_TECH_NAMES = await dbResolveCurrentTechNames();
+    window.CURRENT_TECH_NAME = (window.CURRENT_TECH_NAMES[0] || '');
     window.CAN_EDIT = window.IS_ADMIN;
-    window.CAN_EXECUTE = window.IS_ADMIN || !!window.CURRENT_TECH_NAME;
+    window.CAN_EXECUTE = window.IS_ADMIN || window.CURRENT_TECH_NAMES.length>0;
     const schema = await dbValidateRuntimeSchema();
     if(!schema.ok && window.IS_ADMIN){
       console.warn('[schema] runtime schema mismatch:', schema.missing);
@@ -5400,6 +5426,7 @@ if (window.paintBuildBadge) window.paintBuildBadge();
       window.__DB_BOOTSTRAPPED = false; // ✅ allow bootstrap next login
       window.USE_DB_JOBS = false;
       window.IS_ADMIN = false;                   // ✅ ADD
+      window.CURRENT_TECH_NAMES = [];
       window.CURRENT_TECH_NAME = '';
       window.CAN_EXECUTE = false;
       window.__ENTER_DB_MODE_DONE = false;       // ✅ ADD (so a new login can clean again)
