@@ -112,7 +112,7 @@ button.reset:hover{background:#f6f8ff;}
 .kpiHead{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap;margin-bottom:10px}
 .kpiTitle{font-weight:900}
 .kpiSub{font-size:12px;color:#666}
-.kpiGrid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.kpiGrid{display:grid;grid-template-columns:repeat(11,minmax(0,1fr));gap:10px}
 .kpiCard{border:1px solid #eee;border-radius:14px;padding:10px 12px;background:#fff}
 .kpiLbl{font-size:12px;color:#444;font-weight:900}
 .kpiVal{font-size:22px;font-weight:900;margin-top:4px}
@@ -856,6 +856,18 @@ function scheduleSaveOverridesToDB(){
   <div class="kpiHead">
     <div class="kpiTitle">Dispatch KPIs (active month, filtered)</div>
     <div class="kpiSub" id="kpiSub">— <span id="yearTotal" style="float:right;font-weight:600;"></span></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span class="small">Manager range</span>
+      <select id="analyticsRange" class="edsel" style="height:32px">
+        <option value="all">All</option>
+        <option value="week">This week</option>
+        <option value="month">This month</option>
+        <option value="custom">Custom</option>
+      </select>
+      <input id="analyticsFrom" class="edsel" type="date" style="height:32px;display:none"/>
+      <input id="analyticsTo" class="edsel" type="date" style="height:32px;display:none"/>
+      <span id="analyticsRangeInfo" class="small">All dates</span>
+    </div>
   </div>
   <div class="kpiGrid">
     <div class="kpiCard"><div class="kpiLbl">Total jobs</div><div class="kpiVal" id="kpiTotal">0</div></div>
@@ -863,6 +875,12 @@ function scheduleSaveOverridesToDB(){
     <div class="kpiCard"><div class="kpiLbl">Adil</div><div class="kpiVal" id="kpiAdil">0</div><div class="kpiMini" id="kpiAdilUtil">—</div></div>
     <div class="kpiCard"><div class="kpiLbl">Abdel</div><div class="kpiVal" id="kpiAbdel">0</div><div class="kpiMini" id="kpiAbdelUtil">—</div></div>
     <div class="kpiCard"><div class="kpiLbl">Chadi</div><div class="kpiVal" id="kpiChad">0</div><div class="kpiMini" id="kpiChadUtil">—</div></div>
+    <div class="kpiCard"><div class="kpiLbl">Scheduled</div><div class="kpiVal" id="kpiScheduled">0</div><div class="kpiMini">Execution</div></div>
+    <div class="kpiCard"><div class="kpiLbl">In progress</div><div class="kpiVal" id="kpiInProgress">0</div><div class="kpiMini">Execution</div></div>
+    <div class="kpiCard"><div class="kpiLbl">Completed</div><div class="kpiVal" id="kpiCompleted">0</div><div class="kpiMini">Execution</div></div>
+    <div class="kpiCard"><div class="kpiLbl">Cancelled</div><div class="kpiVal bad" id="kpiCancelled">0</div><div class="kpiMini">Execution</div></div>
+    <div class="kpiCard"><div class="kpiLbl">Overdue</div><div class="kpiVal bad" id="kpiOverdue">0</div><div class="kpiMini">Not completed/cancelled</div></div>
+    <div class="kpiCard"><div class="kpiLbl">Completion rate</div><div class="kpiVal" id="kpiCompletionRate">0%</div><div class="kpiMini" id="kpiCompletionRateSub">—</div></div>
   </div>
 
   <div class="kpiActions">
@@ -897,6 +915,7 @@ function scheduleSaveOverridesToDB(){
           <button class="reset" id="btnHelpGuide" type="button">Help / Tutorial</button>
           <button class="reset" id="btnOnsiteInstall" type="button">Onsite install page</button>
           <button class="reset" id="btnExportJobsCsv" type="button">Export jobs CSV</button>
+          <button class="reset" id="btnExportManagerCsv" type="button">Export manager report CSV</button>
           <button class="reset" id="btnExportOverridesJson" type="button">Export overrides JSON</button>
           <button class="reset" id="btnImportOverridesJson" type="button">Import overrides JSON</button>
           <button class="reset" id="btnAddJob" type="button">Add job</button>
@@ -911,7 +930,18 @@ function scheduleSaveOverridesToDB(){
   </div>
 
   <div class="kpiSplit">
-    
+    <div class="kpiBox">
+      <div class="kpiLbl2">Cancellation reasons</div>
+      <div id="kpiCancelReasons" class="kpiList"></div>
+    </div>
+    <div class="kpiBox">
+      <div class="kpiLbl2">Avg completion delay</div>
+      <div id="kpiAvgDelay" class="kpiList small">—</div>
+    </div>
+    <div class="kpiBox">
+      <div class="kpiLbl2">Completion by tech</div>
+      <div id="kpiCompletionByTech" class="kpiList"></div>
+    </div>
     </div>
 </div></div>
 <div class="kpiSide">
@@ -1284,6 +1314,9 @@ const problemsOnly=document.getElementById('problemsOnly');
 const showCancelled=document.getElementById('showCancelled');
 const resetBtn=document.getElementById('resetBtn');
 const groupChecks=document.getElementById('groupChecks');
+const analyticsRange=document.getElementById('analyticsRange');
+const analyticsFrom=document.getElementById('analyticsFrom');
+const analyticsTo=document.getElementById('analyticsTo');
 
 function el(tag, attrs={}, text=null){
   const e=document.createElement(tag);
@@ -2341,6 +2374,51 @@ function collectAllItems(filters){
   }
   return out;
 }
+
+function dateOnlyIso(v){
+  const s = String(v||'').trim();
+  if(!s) return '';
+  return s.slice(0,10);
+}
+
+function getAnalyticsRangeBounds(){
+  const mode = String(analyticsRange?.value || 'all');
+  const today = new Date();
+  const todayIso = today.toISOString().slice(0,10);
+  if(mode==='all') return { mode, from:'', to:'', label:'All dates' };
+  if(mode==='week'){
+    const d = new Date(today);
+    const day = (d.getDay()+6)%7;
+    d.setDate(d.getDate()-day);
+    const from = d.toISOString().slice(0,10);
+    const t = new Date(d); t.setDate(d.getDate()+6);
+    const to = t.toISOString().slice(0,10);
+    return { mode, from, to, label:`This week (${from} to ${to})` };
+  }
+  if(mode==='month'){
+    const from = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`;
+    const t = new Date(today.getFullYear(), today.getMonth()+1, 0);
+    const to = t.toISOString().slice(0,10);
+    return { mode, from, to, label:`This month (${from} to ${to})` };
+  }
+  let from = dateOnlyIso(analyticsFrom?.value);
+  let to = dateOnlyIso(analyticsTo?.value);
+  if(!from && !to) return { mode:'all', from:'', to:'', label:'All dates' };
+  if(!from) from = '1900-01-01';
+  if(!to) to = '9999-12-31';
+  if(from>to){ const tmp=from; from=to; to=tmp; }
+  return { mode:'custom', from, to, label:`Custom (${from} to ${to})` };
+}
+
+function filterItemsByAnalyticsRange(items, bounds){
+  if(!bounds || !bounds.from || !bounds.to) return items.slice();
+  return items.filter(it=>{
+    const iso = dateOnlyIso(it.iso);
+    if(!iso) return false;
+    return iso>=bounds.from && iso<=bounds.to;
+  });
+}
+
 function calcCapacityByTech(items){
   const dates=new Set(items.map(x=>x.iso));
   const days=dates.size || 0;
@@ -2360,6 +2438,50 @@ function renderKpis(){
     const allFilters={techs:[], region:"ALL", client:"ALL", status:"ALL", groups:[], problemsOnly:false, showCancelled:false};
     const allItems=collectAllItems(allFilters);
     yEl.textContent = `Year total: ${allItems.length}`;
+  }
+
+  const rangeBounds = getAnalyticsRangeBounds();
+  const rangeInfoEl = document.getElementById('analyticsRangeInfo');
+  if(rangeInfoEl) rangeInfoEl.textContent = rangeBounds.label;
+  const execAllFilters={techs:[], region:"ALL", client:"ALL", status:"ALL", groups:[], problemsOnly:false, showCancelled:true};
+  const execItemsAll = collectAllItems(execAllFilters);
+  const execItems = filterItemsByAnalyticsRange(execItemsAll, rangeBounds);
+  const statusCounts = { scheduled:0, in_progress:0, completed:0, cancelled:0, on_hold:0 };
+  const cancelReasons = {};
+  let delayTotal = 0;
+  let delayN = 0;
+  let overdue = 0;
+  let eligibleForCompletionRate = 0;
+  let completedForCompletionRate = 0;
+  const completionByTech = {};
+  for(const it of execItems){
+    const st = String(it.status || (it._cancelled ? 'cancelled' : 'scheduled')).toLowerCase();
+    if(statusCounts[st]===undefined) statusCounts[st]=0;
+    statusCounts[st]++;
+    if(st==='cancelled'){
+      const r = String(it.cancel_reason_code || 'unspecified').trim().toLowerCase() || 'unspecified';
+      cancelReasons[r] = (cancelReasons[r]||0)+1;
+    }
+    const tExec = String(it.tech || 'UNASSIGNED').trim() || 'UNASSIGNED';
+    if(!completionByTech[tExec]) completionByTech[tExec] = { total:0, completed:0 };
+    if(st!=='cancelled'){
+      completionByTech[tExec].total += 1;
+      eligibleForCompletionRate += 1;
+      if(st==='completed'){
+        completionByTech[tExec].completed += 1;
+        completedForCompletionRate += 1;
+      }
+    }
+    if(st!=='completed' && st!=='cancelled' && it.iso && it.iso < dateOnlyIso(new Date().toISOString())) overdue += 1;
+    if(st==='completed' && it.iso && it.actual_end_at){
+      const dPlan = new Date(`${it.iso}T00:00:00`);
+      const dDone = new Date(it.actual_end_at);
+      if(!isNaN(dPlan.getTime()) && !isNaN(dDone.getTime())){
+        const dd = Math.round((dDone - dPlan) / 86400000);
+        delayTotal += dd;
+        delayN++;
+      }
+    }
   }
 
   const counts={}; TECHS.forEach(t=>counts[t]=0);
@@ -2392,6 +2514,22 @@ function renderKpis(){
   if(elA) elA.textContent = counts['Adil']||0;
   if(elB) elB.textContent = counts['Abdel']||0;
   if(elU) elU.textContent = counts['Chadi']||0;
+
+  const elSch=document.getElementById('kpiScheduled');
+  const elProg=document.getElementById('kpiInProgress');
+  const elComp=document.getElementById('kpiCompleted');
+  const elCanc=document.getElementById('kpiCancelled');
+  if(elSch) elSch.textContent = statusCounts.scheduled||0;
+  if(elProg) elProg.textContent = statusCounts.in_progress||0;
+  if(elComp) elComp.textContent = statusCounts.completed||0;
+  if(elCanc) elCanc.textContent = statusCounts.cancelled||0;
+  const elOver=document.getElementById('kpiOverdue');
+  if(elOver) elOver.textContent = overdue;
+  const elRate=document.getElementById('kpiCompletionRate');
+  const elRateSub=document.getElementById('kpiCompletionRateSub');
+  const rate = eligibleForCompletionRate ? Math.round((completedForCompletionRate/eligibleForCompletionRate)*100) : 0;
+  if(elRate) elRate.textContent = `${rate}%`;
+  if(elRateSub) elRateSub.textContent = `${completedForCompletionRate}/${eligibleForCompletionRate} non-cancelled`; 
 
   // Utilization: max 2 jobs/day/tech for days in month
   let daysInMonth=0;
@@ -2448,6 +2586,40 @@ function renderKpis(){
   }
   const locEl=document.getElementById('kpiLocs');
   if(locEl) locEl.textContent = Object.keys(locs).length;
+
+  const reasonEl=document.getElementById('kpiCancelReasons');
+  if(reasonEl){
+    const reasonEntries = Object.entries(cancelReasons).sort((a,b)=>b[1]-a[1]);
+    if(!reasonEntries.length){
+      reasonEl.innerHTML = '<div class="small">No cancelled jobs</div>';
+    }else{
+      reasonEl.innerHTML = reasonEntries.slice(0,8).map(([k,v])=>`<div class="kpiRow"><div style="min-width:140px;font-weight:700">${k}</div><div class="kpiNum">${v}</div></div>`).join('');
+    }
+  }
+  const avgDelayEl=document.getElementById('kpiAvgDelay');
+  if(avgDelayEl){
+    if(!delayN) avgDelayEl.textContent = 'No completed jobs with finish date yet.';
+    else avgDelayEl.textContent = `${(delayTotal/delayN).toFixed(1)} day(s) from planned date to completion (${delayN} jobs).`;
+  }
+
+  const byTechEl=document.getElementById('kpiCompletionByTech');
+  if(byTechEl){
+    const rows = Object.entries(completionByTech)
+      .filter(([t,v])=>t!=='UNASSIGNED' && v.total>0)
+      .sort((a,b)=>{
+        const ar = a[1].total ? (a[1].completed/a[1].total) : 0;
+        const br = b[1].total ? (b[1].completed/b[1].total) : 0;
+        return br-ar;
+      });
+    if(!rows.length){
+      byTechEl.innerHTML = '<div class="small">No executed jobs yet</div>';
+    }else{
+      byTechEl.innerHTML = rows.map(([t,v])=>{
+        const pct = v.total ? Math.round((v.completed/v.total)*100) : 0;
+        return `<div class="kpiRow"><div style="min-width:120px;font-weight:700">${t}</div><div class="kpiNum">${pct}% (${v.completed}/${v.total})</div></div>`;
+      }).join('');
+    }
+  }
 
   // Capacity alert: days with >2 jobs per tech
   let overCap=0;
@@ -2650,6 +2822,51 @@ function exportJobsCsv(){
   const csv = rows.map(r=>r.map(csvEscape).join(',')).join('\n');
   downloadText(`jobs_${payload.year}.csv`, csv, 'text/csv;charset=utf-8');
 }
+
+function exportManagerReportCsv(){
+  rebuildMonthsFromOverrides();
+  const filters = currentFilters();
+  const range = getAnalyticsRangeBounds();
+  const baseFilters = { ...filters, status:'ALL', showCancelled:true };
+  let rows = collectAllItems(baseFilters);
+  rows = filterItemsByAnalyticsRange(rows, range);
+  rows.sort((a,b)=>String(a.iso||'').localeCompare(String(b.iso||'')) || String(a.tech||'').localeCompare(String(b.tech||'')));
+
+  const out=[["Planned Date","Actual Start","Actual End","Status","Client","Tech","Additional Techs","Region","Site","Work Order","Address","Cancel Reason","Cancel Note","Delay Days","Overdue"]];
+  const today = dateOnlyIso(new Date().toISOString());
+  for(const it of rows){
+    const st = String(it.status || (it._cancelled?'cancelled':'scheduled')).toLowerCase();
+    let delay = '';
+    if(st==='completed' && it.iso && it.actual_end_at){
+      const dPlan = new Date(`${it.iso}T00:00:00`);
+      const dDone = new Date(it.actual_end_at);
+      if(!isNaN(dPlan.getTime()) && !isNaN(dDone.getTime())) delay = String(Math.round((dDone-dPlan)/86400000));
+    }
+    const overdue = (st!=='completed' && st!=='cancelled' && it.iso && it.iso<today) ? 'YES' : 'NO';
+    out.push([
+      it.iso||'',
+      it.actual_start_at||'',
+      it.actual_end_at||'',
+      st,
+      it.client||'',
+      it.tech||'',
+      Array.isArray(it.additional_techs)?it.additional_techs.join(' | '):'',
+      it.region||'',
+      it.site||'',
+      it.wo||'',
+      it.destination||'',
+      it.cancel_reason_code||'',
+      it.cancel_reason_note||'',
+      delay,
+      overdue
+    ]);
+  }
+  const csv = out.map(r=>r.map(csvEscape).join(',')).join('
+');
+  const tag = (range.mode||'all');
+  downloadText(`manager_report_${payload.year}_${tag}.csv`, csv, 'text/csv;charset=utf-8');
+}
+
 function importJobsCsv(file){
   const reader=new FileReader();
   reader.onload=async ()=>{
@@ -2882,6 +3099,7 @@ function importAllJson(file){
 
 // Wire buttons
 document.getElementById('btnExportJobsCsv')?.addEventListener('click', exportJobsCsv);
+document.getElementById('btnExportManagerCsv')?.addEventListener('click', exportManagerReportCsv);
 document.getElementById('btnImportJobsCsv')?.addEventListener('click', ()=>pickFile('.csv,text/csv', importJobsCsv));
 document.getElementById('btnExportAllJson')?.addEventListener('click', exportAllJson);
 document.getElementById('btnImportAllJson')?.addEventListener('click', ()=>pickFile('.json,application/json', importAllJson));
@@ -4772,6 +4990,19 @@ if(clientFilter && clientFilterSide){
   clientFilterSide.value = clientFilter.value;
 }
 if(statusFilterSide){ statusFilterSide.onchange = rerenderActive; }
+if(analyticsRange){
+  analyticsRange.onchange=()=>{
+    const custom = analyticsRange.value==='custom';
+    if(analyticsFrom) analyticsFrom.style.display = custom ? '' : 'none';
+    if(analyticsTo) analyticsTo.style.display = custom ? '' : 'none';
+    rerenderActive();
+  };
+  const custom = analyticsRange.value==='custom';
+  if(analyticsFrom) analyticsFrom.style.display = custom ? '' : 'none';
+  if(analyticsTo) analyticsTo.style.display = custom ? '' : 'none';
+}
+if(analyticsFrom) analyticsFrom.onchange=rerenderActive;
+if(analyticsTo) analyticsTo.onchange=rerenderActive;
 problemsOnly.onchange=rerenderActive;
 showCancelled.onchange=rerenderActive;
 resetBtn.onclick=()=>{
@@ -4782,6 +5013,9 @@ resetBtn.onclick=()=>{
   if(statusFilterSide) statusFilterSide.value='ALL';
   problemsOnly.checked=false;
   if(showCancelled) showCancelled.checked=false;
+  if(analyticsRange) analyticsRange.value='all';
+  if(analyticsFrom){ analyticsFrom.value=''; analyticsFrom.style.display='none'; }
+  if(analyticsTo){ analyticsTo.value=''; analyticsTo.style.display='none'; }
   document.querySelectorAll('#groupChecks input[type=checkbox]').forEach(cb=>cb.checked=false);
   rerenderActive();
 };
@@ -4826,7 +5060,7 @@ function setEditModeUI(){
     // import/export/admin tools
     "btnExportMonthCsv", "btnOpenMyMaps",
     "btnExportOverridesJson", "btnImportOverridesJson",
-    "btnExportJobsCsv", "btnImportJobsCsv",
+    "btnExportJobsCsv", "btnExportManagerCsv", "btnImportJobsCsv",
     "btnExportAllJson", "btnImportAllJson",
     "btnAddJob", "btnManageTechs", "btnToggleMultiTech", "btnToggleAreaRules", "btnManageAreaRules", "btnManageGroups", "syncStatus",
     "btnPlanGenerate", "btnPlanOptimize", "btnPlanCompare", "btnPlanApply", "btnSyncToDb", "btnPlanReset", "resetBatchSelect", "btnRefreshBatches", "btnPlanExport",
