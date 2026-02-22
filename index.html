@@ -27,9 +27,9 @@ h2{margin:0 0 6px 0;}
 .navQuick{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0 0 0}
 .navBtn{display:inline-flex;align-items:center;gap:6px;border:1px solid #d1d5db;background:#fff;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:700;color:#1f2937;text-decoration:none}
 .navBtn:hover{background:#eef2ff;border-color:#b6c6ff}
-.toolbar{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:12px;align-items:start;margin:12px 0 14px 0;max-width:1400px}
-.toolbarMain{display:flex;gap:12px;flex-wrap:wrap;align-items:end}
-.toolbarSide{display:flex;flex-direction:column;gap:8px}
+.toolbar{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:12px;align-items:start;margin:10px 0 12px 0;max-width:1400px}
+.toolbarMain{display:flex;gap:10px;flex-wrap:wrap;align-items:end;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:10px}
+.toolbarSide{display:flex;flex-direction:column;gap:8px;position:sticky;top:10px}
 .field{display:flex;flex-direction:column;gap:6px;}
 .techFilters summary{cursor:pointer;font-size:12px;font-weight:800;color:#374151}
 .techFilters{border:1px dashed #dbe2ea;border-radius:10px;padding:6px 8px;background:#fbfdff}
@@ -51,9 +51,9 @@ button.reset:hover{background:#f6f8ff;}
 .tab.hasJobs{background:#fef9c3;border-color:#facc15;}
 .panel{display:none;}
 .panel.active{display:block;}
-.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;max-width:980px;}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;max-width:1260px;}
 .dow{font-weight:900;text-align:center;margin-bottom:6px;}
-.celllink{display:block;border:1px solid #eee;border-radius:10px;min-height:76px;padding:8px;background:#fff;position:relative;cursor:pointer;user-select:none;color:inherit;text-decoration:none;}
+.celllink{display:block;border:1px solid #eee;border-radius:12px;min-height:94px;padding:10px;background:#fff;position:relative;cursor:pointer;user-select:none;color:inherit;text-decoration:none;}
 .celllink:hover{border-color:#b6c6ff;box-shadow:0 0 0 2px rgba(182,198,255,.25) inset;}
 .celllink.busy{background:#d9e2f3;border-color:#c7d5ff;}
 .celllink.problem{background:#ffe1e1;border-color:#ff9b9b;}
@@ -64,14 +64,14 @@ button.reset:hover{background:#f6f8ff;}
 .load b{color:#111;}
 .ext{position:absolute;top:8px;right:8px;font-weight:900;font-size:12px;color:#0b5bd3;opacity:.85}
 .ext:hover{opacity:1}
-.drawer{max-width:1100px;margin:14px 0 22px 0;border:1px solid #eee;border-radius:14px;background:#fff;padding:12px 14px;display:none;}
+.drawer{max-width:1280px;margin:14px 0 22px 0;border:1px solid #eee;border-radius:14px;background:#fff;padding:12px 14px;display:none;}
 .drawer.active{display:block;}
 .drawerhead{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;}
 .drawerhead .title{font-weight:900;}
 .close{border:1px solid #ddd;border-radius:10px;background:#fff;padding:6px 10px;cursor:pointer;}
 .close:hover{background:#f6f8ff;}
 .list{display:flex;flex-direction:column;gap:8px;}
-.item{border:1px solid #eee;border-radius:12px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;gap:10px;}
+.item{border:1px solid #eee;border-radius:12px;padding:10px 12px;display:grid;grid-template-columns:minmax(280px,1fr) auto auto;align-items:center;gap:10px;}
 .item.unassigned{border-color:#ffb3b3;background:#fff5f5;}
 .item.teamjob{border-color:#b9e3ff;background:#f3faff;}
 .item .meta{display:flex;flex-direction:column;gap:4px;}
@@ -147,10 +147,10 @@ button.reset:hover{background:#f6f8ff;}
 }
 
 
-.edit{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-top:8px}
+.edit{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-top:8px}
 .edgrp{display:flex;flex-direction:column;gap:4px}
 .edlbl{font-size:11px;color:#666;font-weight:900}
-.edsel{border:1px solid #ddd;border-radius:10px;padding:7px 9px;background:#fff;min-width:180px;height:36px}
+.edsel{border:1px solid #ddd;border-radius:10px;padding:7px 9px;background:#fff;min-width:150px;height:36px}
 .edactions{display:flex;gap:8px;align-items:center}
 .edbtn{border:1px solid #ddd;border-radius:10px;padding:7px 10px;background:#fff;cursor:pointer;height:36px;font-weight:900}
 .edbtn:hover{background:#f6f8ff;border-color:#b6c6ff}
@@ -206,6 +206,15 @@ button.reset:hover{background:#f6f8ff;}
 .scenarioStrip .chip{font-size:12px;border-radius:999px;padding:2px 8px;background:#fff;border:1px solid #bfdbfe;color:#1e3a8a}
 .scenarioStrip .chip.warn{border-color:#fecaca;color:#991b1b;background:#fff1f2}
 .plannerAdvanced summary{cursor:pointer;font-weight:700;color:#374151}
+.kpiToggle{margin:8px 0 14px 0}
+.kpiToggle>summary{cursor:pointer;font-weight:800;color:#1f2937;background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:8px 10px;display:inline-block}
+.kpiToggle[open]>summary{background:#eef2ff;border-color:#c7d2fe}
+.postalTag{display:inline-block;padding:2px 6px;border-radius:999px;border:1px solid #dbeafe;background:#eff6ff;color:#1e3a8a;font-size:11px;font-weight:800}
+.item{border:1px solid #eee;border-radius:12px;padding:10px 12px;display:grid;grid-template-columns:minmax(300px,1fr) minmax(340px,auto);align-items:start;gap:10px;}
+.actionRail{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.actionRail .openMapBtn{border:1px solid #bfdbfe;background:#eff6ff;color:#1d4ed8;border-radius:10px;padding:6px 10px;text-decoration:none;font-weight:800}
+@media (max-width:980px){.item{grid-template-columns:1fr}.actionRail{width:100%}}
+.planDetails{border:1px dashed #d6dce6;border-radius:10px;padding:6px 8px;background:#fbfcff;min-width:280px}.planDetails summary{cursor:pointer;font-size:12px;font-weight:800;color:#334155}.planBody{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}.postalHint{position:absolute;top:28px;left:10px;font-size:11px;color:#1f2937;background:#f8fafc;border:1px solid #e2e8f0;border-radius:999px;padding:1px 6px}@media (max-width:980px){.item{grid-template-columns:1fr}.toolbarSide{position:static}}
 
 </style> 
 <!-- Supabase client with CDN fallback -->
@@ -857,7 +866,7 @@ function scheduleSaveOverridesToDB(){
 
 
 
-<div class="kpiLayout" id="kpiLayout">
+<details id="kpiToggle" class="kpiToggle"><summary>Manager analytics</summary><div class="kpiLayout" id="kpiLayout">
   <div class="kpiMain">
 <div class="kpiWrap" id="kpiWrap">
   <div class="kpiHead">
@@ -959,7 +968,7 @@ function scheduleSaveOverridesToDB(){
       <div id="kpiRegions" class="kpiList"></div>
     </div>
 </div>
-</div>
+</div></details>
 
 <div id="techViewHint" class="small" style="display:none;margin:8px 0 10px 0;padding:8px 10px;border:1px solid #dbeafe;background:#eff6ff;border-radius:10px;">Tech view: focused on calendar operations. KPI dashboard is available from the top button.</div>
 <div class="tabs" id="tabs"></div>
@@ -1644,7 +1653,7 @@ function openDrawer(drawer, title, items, iso){
     }
     line1.appendChild(el('span',{class:'small'},it.region||''));
     const drawerPostal = (it.postal_code || extractPostalCode(it.destination || '') || '').trim();
-    if(drawerPostal) line1.appendChild(el('span',{class:'small',title:'Postal code'},drawerPostal));
+    if(drawerPostal) line1.appendChild(el('span',{class:'postalTag',title:'Postal code'},drawerPostal));
     line1.appendChild(el('span',{},it.site||''));
     line1.appendChild(el('span',{class:'small'},it.wo||''));
     if(isCancelled){ line1.appendChild(el('span',{class:'cancelPill'},'CANCELLED')); }
@@ -1662,6 +1671,12 @@ function openDrawer(drawer, title, items, iso){
 
     const controls = document.createElement('div');
     controls.className='edit';
+    const planningDetails = document.createElement('details');
+    planningDetails.className='planDetails';
+    const planningSummary = document.createElement('summary');
+    planningSummary.textContent='Planner options';
+    const planningBody = document.createElement('div');
+    planningBody.className='planBody';
 
     const k = jobKey(it, iso);
     const currentTech  = techOverrides[k]  || it.tech;
@@ -1683,7 +1698,7 @@ function openDrawer(drawer, title, items, iso){
     });
     grp.appendChild(lbl);
     grp.appendChild(techSel);
-    controls.appendChild(grp);
+    planningBody.appendChild(grp);
 
     // Slot group
     const grp2 = document.createElement('div');
@@ -1701,7 +1716,7 @@ function openDrawer(drawer, title, items, iso){
     });
     grp2.appendChild(lbl2);
     grp2.appendChild(plageSel);
-    controls.appendChild(grp2);
+    planningBody.appendChild(grp2);
 
     // Status group (execution controls)
     const grpS = document.createElement('div');
@@ -1888,7 +1903,7 @@ function openDrawer(drawer, title, items, iso){
 
     grp3.appendChild(lbl3);
     grp3.appendChild(dateInp);
-    controls.appendChild(grp3);
+    planningBody.appendChild(grp3);
 
     // Multi-tech group (manual toggle)
     if(FEATURE_MULTI_TECH && window.CAN_EDIT){
@@ -2008,7 +2023,7 @@ function openDrawer(drawer, title, items, iso){
       grpM.appendChild(lblM);
       grpM.appendChild(wrapM);
       grpM.appendChild(chips);
-      controls.appendChild(grpM);
+      planningBody.appendChild(grpM);
     }
 
     // Consolidated Apply/Reset (Tech + AM/PM + Date)
@@ -2039,11 +2054,9 @@ if(!window.CAN_EDIT){
   applyAll.disabled = true;
   resetAll.disabled = true;
 
-  btnCancel.disabled = true;
-
-  // Option A (recommended): hide edit panel completely
-  controls.style.display = "none";
+  planningDetails.style.display = "none";
 }
+
 
 // keep your onclicks (they won’t be reachable when hidden/disabled)
 
@@ -2132,14 +2145,21 @@ if(!window.CAN_EDIT){
     actionsA.appendChild(resetAll);
     grpA.appendChild(lblA);
     grpA.appendChild(actionsA);
-    controls.appendChild(grpA);
+    planningBody.appendChild(grpA);
 
 
-    const a=el('a',{href:buildMapsLink(it.destination||it.url||''),target:'_blank'},'Open Map');
+    planningDetails.appendChild(planningSummary);
+    planningDetails.appendChild(planningBody);
+    controls.appendChild(planningDetails);
+
+    const a=el('a',{class:'openMapBtn',href:buildMapsLink(it.destination||it.url||''),target:'_blank'},'Open Map');
+    const rail=document.createElement('div');
+    rail.className='actionRail';
+    rail.appendChild(controls);
+    rail.appendChild(a);
 
     row.appendChild(meta);
-    row.appendChild(controls);
-    row.appendChild(a);
+    row.appendChild(rail);
     list.appendChild(row);
   }
 }
@@ -2192,6 +2212,12 @@ function makePanel(mid, m){
 
         a.appendChild(el('div',{class:'daynum'},String(d)));
         if(cnt>0) a.appendChild(el('div',{class:'count'},String(cnt)));
+        const cellPostal = items.map(x => (x.postal_code || extractPostalCode(x.destination || '') || '').trim()).filter(Boolean);
+        if(cellPostal.length){
+          const uniquePostal = Array.from(new Set(cellPostal));
+          const ptxt = uniquePostal.length>1 ? `${uniquePostal[0]} +${uniquePostal.length-1}` : uniquePostal[0];
+          a.appendChild(el('div',{class:'postalHint',title:'Postal code(s)'},ptxt));
+        }
 
         // small load per tech (filtered) — show all techs (up to 5) in priority order
         const byTech = {};
@@ -5207,6 +5233,15 @@ function setEditModeUI(){
 
   const kpiLayout = document.getElementById('kpiLayout');
   if(kpiLayout) kpiLayout.style.display = isAdmin ? '' : 'none';
+  const kpiToggle=document.getElementById('kpiToggle');
+  if(kpiToggle){
+    if(isAdmin){
+      kpiToggle.style.display='';
+      if(!kpiToggle.hasAttribute('open')) kpiToggle.open = false;
+    }else{
+      kpiToggle.style.display='none';
+    }
+  }
   const techHint = document.getElementById('techViewHint');
   if(techHint) techHint.style.display = isAdmin ? 'none' : '';
 }
