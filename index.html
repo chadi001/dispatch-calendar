@@ -56,6 +56,7 @@ button.reset:hover{background:#f6f8ff;}
 .celllink{display:block;border:1px solid #eee;border-radius:12px;min-height:94px;padding:10px;background:#fff;position:relative;cursor:pointer;user-select:none;color:inherit;text-decoration:none;}
 .celllink:hover{border-color:#b6c6ff;box-shadow:0 0 0 2px rgba(182,198,255,.25) inset;}
 .celllink.busy{background:#d9e2f3;border-color:#c7d5ff;}
+.celllink.completed{background:#dcfce7;border-color:#86efac;}
 .celllink.problem{background:#ffe1e1;border-color:#ff9b9b;}
 .celllink.selected{outline:3px solid rgba(31,78,121,.35);}
 .daynum{position:absolute;top:8px;left:8px;font-weight:900;font-size:14px;color:#9aa0a6;}
@@ -91,6 +92,7 @@ button.reset:hover{background:#f6f8ff;}
 .job:hover{text-decoration:underline;}
 .job.unassigned{border-color:#ffb3b3;background:#fff5f5;color:#b00020;font-weight:900;}
 .job.teamjob{border-color:#b9e3ff;background:#f3faff;color:#0b4a8b;}
+.job.completed{border-color:#86efac;background:#ecfdf5;color:#065f46;}
 .job .meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
 .job .amtag,.job .pmtag{font-weight:900;font-size:12px;border-radius:999px;padding:2px 8px;border:1px solid #eee;}
 .job .amtag{background:#f5f7ff;border-color:#dfe7ff;}
@@ -174,6 +176,7 @@ button.reset:hover{background:#f6f8ff;}
 .clientTag.unk{background:#f2f2f2;color:#444}
 .item.cancelled{opacity:.55}
 .item.cancelled .dest{text-decoration:line-through}
+.item.completed{border-color:#bbf7d0;background:#f0fdf4}
 .cancelPill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;background:#111;color:#fff;margin-left:6px}
 .resultsTable{width:100%;border-collapse:collapse;margin-top:10px}
 .resultsTable th,.resultsTable td{border-bottom:1px solid #eee;padding:8px 6px;font-size:13px;text-align:left;vertical-align:top}
@@ -806,15 +809,6 @@ function scheduleSaveOverridesToDB(){
 <div id="appContent" style="display:none;">
   <div class="toolbar">
     <div class="toolbarMain">
-      <div class="field">
-        <label for="clientFilter">Client</label>
-        <select id="clientFilter">
-          <option value="ALL">All</option>
-          <option value="GOCO">GOCO / COGO</option>
-          <option value="COGO">COGO</option>
-          <option value="MCN">MCN</option>
-        </select>
-      </div>
       <div class="chk">
         <input type="checkbox" id="problemsOnly"/>
         <label for="problemsOnly" style="font-size:13px;margin:0;">Problems only (UNASSIGNED)</label>
@@ -1331,7 +1325,6 @@ if (window.USE_DB_JOBS === false) applyManualJobsToPayload();
 const tabs=document.getElementById('tabs');
 const content=document.getElementById('content');
 const regionFilter=document.getElementById('regionFilter');
-const clientFilter=document.getElementById('clientFilter');
 const clientFilterSide=document.getElementById('clientFilterSide');
 const statusFilterSide=document.getElementById('statusFilterSide');
 const problemsOnly=document.getElementById('problemsOnly');
@@ -1458,11 +1451,7 @@ function collectAdministrativeRegions(){
 }
 
 function getClientFilterValue(){
-  const topVal = String(clientFilter?.value || 'ALL');
-  const sideVal = String(clientFilterSide?.value || 'ALL');
-  if(sideVal !== 'ALL') return sideVal;
-  if(topVal !== 'ALL') return topVal;
-  return 'ALL';
+  return String(clientFilterSide?.value || 'ALL');
 }
 function currentFilters(){
   const clientVal = getClientFilterValue();
@@ -1572,7 +1561,18 @@ function extractPostalCode(text){
 function getPostalForItem(it){
   const direct = normalizePostalCode(it?.postal_code || '');
   if(direct) return direct;
-  const joined = [it?.destination, it?.address, it?.city, it?.region, it?.province].filter(Boolean).join(' ');
+  const joined = [
+    it?.destination,
+    it?.address,
+    it?.city,
+    it?.region,
+    it?.province,
+    it?.raw?.address,
+    it?.raw?.city,
+    it?.raw?.postal_code,
+    it?.raw?.postal,
+    it?.raw?.zip
+  ].filter(Boolean).join(' ');
   return extractPostalCode(joined);
 }
 
@@ -1636,7 +1636,8 @@ function openDrawer(drawer, title, items, iso){
   for(const it of items){
     const kPre = jobKey(it, iso);
     const isCancelled = !!it._cancelled;
-    const row=el('div',{class:'item'+(it.unassigned?' unassigned':'')+(it.teamJob?' teamjob':'')+(isCancelled?' cancelled':'')});
+    const isCompleted = String(it.status||'').toLowerCase()==='completed';
+    const row=el('div',{class:'item'+(it.unassigned?' unassigned':'')+(it.teamJob?' teamjob':'')+(isCancelled?' cancelled':'')+(isCompleted?' completed':'')});
     if(it.teamJob && it.groupColor){
       row.style.borderColor = it.groupColor;
       row.style.background = it.groupColor + '22';
@@ -1666,10 +1667,12 @@ function openDrawer(drawer, title, items, iso){
       line1.appendChild(el('span',{class:'small',title:'Group'}, '['+it.groupName+']'));
     }
     line1.appendChild(el('span',{class:'small'},it.region||''));
-    const drawerPostal = getPostalForItem(it);
-    if(drawerPostal) line1.appendChild(el('span',{class:'postalTag',title:'Postal code'},drawerPostal));
-    line1.appendChild(el('span',{},it.site||''));
-    line1.appendChild(el('span',{class:'small'},it.wo||''));
+    const drawerPostal = getPostalForItem(it) || 'NO POSTAL';
+    line1.appendChild(el('span',{class:'postalTag',title:'Postal code'},drawerPostal));
+    const woTxt = String(it.wo||'').trim();
+    const siteTxt = String(it.site||'').trim();
+    if(woTxt) line1.appendChild(el('span',{class:'small'},`WO ${woTxt}`));
+    else if(siteTxt) line1.appendChild(el('span',{class:'small'},siteTxt));
     if(isCancelled){ line1.appendChild(el('span',{class:'cancelPill'},'CANCELLED')); }
     meta.appendChild(line1);
     meta.appendChild(el('div',{class:'dest'},it.destination||''));
@@ -2073,7 +2076,9 @@ function makePanel(mid, m){
         const a=el('a',{class:'celllink',href:route});
         if(route!=='#') a.setAttribute('target','_blank');
         const cnt=counts[iso]||0;
+        const hasCompleted = items.some(it => String(it.status||'').toLowerCase()==='completed');
         if(cnt>0) a.classList.add('busy');
+        if(hasCompleted) a.classList.add('completed');
         if(problems.has(iso)) a.classList.add('problem');
 
         a.appendChild(el('div',{class:'daynum'},String(d)));
@@ -2182,7 +2187,8 @@ function makePanel(mid, m){
           const arr=filtered[i]||[];
           if(r<arr.length){
             const it=arr[r];
-            const link=el('a',{class:'job'+(it.unassigned?' unassigned':'')+(it.teamJob?' teamjob':''),href:buildMapsLink(it.destination||it.url||''),target:'_blank'});
+            const doneCls = String(it.status||'').toLowerCase()==='completed' ? ' completed' : '';
+            const link=el('a',{class:'job'+(it.unassigned?' unassigned':'')+(it.teamJob?' teamjob':'')+doneCls,href:buildMapsLink(it.destination||it.url||''),target:'_blank'});
             if(it.teamJob && it.groupColor){
               link.style.borderColor = it.groupColor;
               link.style.background = it.groupColor + '22';
@@ -2193,7 +2199,7 @@ function makePanel(mid, m){
             tt.style.background = techColors[it.tech] || '#777';
             const c = (it.client||'').trim().toUpperCase();
             const ct = el('span',{class:'clientTag ' + (c==='GOCO' || c==='COGO' ? 'goco' : (c==='MCN' ? 'mcn' : 'unk'))}, c || '—');
-            const weeklyPostal = getPostalForItem(it);
+            const weeklyPostal = getPostalForItem(it) || 'NO POSTAL';
             const idTxt = (it.wo && String(it.wo).trim()) ? `WO ${String(it.wo).trim()}` : ((it.site && String(it.site).trim()) ? `Site ${String(it.site).trim()}` : '');
             const extraNames = Array.isArray(it.additional_techs) ? it.additional_techs : [];
             const extraN = extraNames.length;
@@ -4975,20 +4981,8 @@ function rebuildMonthsFromOverrides(){
 // Build UI (DB-aware bootstrap)
 function wireHandlers(){
 regionFilter.onchange=rerenderActive;
-if(clientFilter){
-  clientFilter.onchange=function(){
-    if(clientFilterSide) clientFilterSide.value = clientFilter.value;
-    rerenderActive();
-  };
-}
 if(clientFilterSide){
-  clientFilterSide.onchange=function(){
-    if(clientFilter) clientFilter.value = clientFilterSide.value;
-    rerenderActive();
-  };
-}
-if(clientFilter && clientFilterSide){
-  clientFilterSide.value = clientFilter.value;
+  clientFilterSide.onchange=function(){ rerenderActive(); };
 }
 if(statusFilterSide){ statusFilterSide.onchange = rerenderActive; }
 if(analyticsRange){
@@ -5009,7 +5003,6 @@ showCancelled.onchange=rerenderActive;
 resetBtn.onclick=()=>{
   document.querySelectorAll("#techChecks input[type=checkbox]").forEach(cb=>cb.checked=false);
   regionFilter.value='ALL';
-  if(clientFilter) clientFilter.value='ALL';
   if(clientFilterSide) clientFilterSide.value='ALL';
   if(statusFilterSide) statusFilterSide.value='ALL';
   problemsOnly.checked=false;

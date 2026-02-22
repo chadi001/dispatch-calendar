@@ -101,6 +101,46 @@ function buildChecklistHtml(ck){
   return html;
 }
 
+const CANCEL_REASON_OPTIONS = [
+  { code:'client_request', label:'Client request' },
+  { code:'no_access', label:'No access' },
+  { code:'traffic_driving', label:'Traffic / driving' },
+  { code:'too_far', label:'Too far' },
+  { code:'parts_missing', label:'Parts missing' },
+  { code:'weather', label:'Weather' },
+  { code:'other', label:'Other' }
+];
+
+function pickCancelReason(){
+  return new Promise((resolve)=>{
+    const modal = document.createElement('div');
+    modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:14px';
+    modal.innerHTML = `
+      <div style="position:absolute;inset:0;background:rgba(0,0,0,.35)"></div>
+      <div style="position:relative;background:#fff;border-radius:14px;border:1px solid #e2e8f0;padding:12px;max-width:480px;width:100%;display:flex;flex-direction:column;gap:8px">
+        <div style="font-weight:800">Cancel job</div>
+        <label class="small" for="cancelReasonSel">Reason</label>
+        <select id="cancelReasonSel">${CANCEL_REASON_OPTIONS.map(x=>`<option value="${x.code}">${x.label}</option>`).join('')}</select>
+        <label class="small" for="cancelReasonNote">Optional note</label>
+        <textarea id="cancelReasonNote" class="noteInput" placeholder="Add extra details (optional)"></textarea>
+        <div class="row" style="justify-content:flex-end">
+          <button type="button" data-act="dismiss">Close</button>
+          <button type="button" class="primary" data-act="confirm">Confirm cancel</button>
+        </div>
+      </div>`;
+    const close = (v)=>{ try{ modal.remove(); }catch(e){} resolve(v); };
+    modal.querySelector('[data-act="dismiss"]').onclick = ()=>close(null);
+    modal.querySelector('[data-act="confirm"]').onclick = ()=>{
+      const reason = String(modal.querySelector('#cancelReasonSel')?.value || '').trim();
+      if(!reason) return alert('Cancel reason is required');
+      const note = String(modal.querySelector('#cancelReasonNote')?.value || '').trim();
+      close({ reason, note: note || null });
+    };
+    modal.firstElementChild.onclick = ()=>close(null);
+    document.body.appendChild(modal);
+  });
+}
+
 async function loadJobs(){
   const host=document.getElementById('jobs');
   host.innerHTML='<div class="small">Loading...</div>';
@@ -165,10 +205,9 @@ async function loadJobs(){
     card.querySelector('[data-act="cancel"]').onclick=async()=>{
       const doCancel = status!=='cancelled';
       if(doCancel){
-        const reason = prompt('Cancel reason code (client_request, no_access, traffic_driving, too_far, parts_missing, weather, other):','client_request');
-        if(!reason) return;
-        const note = prompt('Optional note','') || null;
-        const out=await rpc('tech_set_job_cancelled',{p_job_id:j.id,p_cancelled:true,p_reason_code:reason,p_reason_note:note});
+        const pick = await pickCancelReason();
+        if(!pick) return;
+        const out=await rpc('tech_set_job_cancelled',{p_job_id:j.id,p_cancelled:true,p_reason_code:pick.reason,p_reason_note:pick.note});
         if(!out.ok) return alert(out.error);
       }else{
         const out=await rpc('tech_set_job_cancelled',{p_job_id:j.id,p_cancelled:false,p_reason_code:null,p_reason_note:null});
