@@ -511,6 +511,17 @@ async function dbLoadJobs() {
   window.CURRENT_TECH_NAMES = myTechs;
   window.CURRENT_TECH_NAME = myTechs[0] || '';
 
+  try{
+    const { data: visRows, error: visErr } = await window.sb.rpc('list_visible_jobs');
+    if(!visErr && Array.isArray(visRows)){
+      console.log("[dbLoadJobs] TECH mode rows (rpc):", visRows.length, "mapped techs:", myTechs.join(', '));
+      return visRows;
+    }
+    if(visErr) console.warn('[dbLoadJobs] list_visible_jobs rpc error:', visErr);
+  }catch(e){
+    console.warn('[dbLoadJobs] list_visible_jobs rpc exception:', e);
+  }
+
   const { data, error } = await window.sb
     .from("jobs")
     .select("*");
@@ -518,7 +529,7 @@ async function dbLoadJobs() {
   if (error) throw error;
 
   const rows = data || [];
-  console.log("[dbLoadJobs] TECH mode rows (RLS):", rows.length, "mapped techs:", myTechs.join(', '));
+  console.log("[dbLoadJobs] TECH mode rows (RLS fallback):", rows.length, "mapped techs:", myTechs.join(', '));
   return rows;
 } // ✅ CLOSE dbLoadJobs()
 
