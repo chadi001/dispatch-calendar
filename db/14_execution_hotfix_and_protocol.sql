@@ -1,7 +1,7 @@
 -- Hotfix: legacy checklist schema + richer onsite checklist protocol
 begin;
 
--- 1) Legacy compatibility: some environments have job_checklist_id NOT NULL without default
+-- 1) Legacy compatibility: some environments have legacy job_checklist_id from old model
 DO $$
 BEGIN
   IF EXISTS (
@@ -11,8 +11,8 @@ BEGIN
       AND table_name='job_checklist_items'
       AND column_name='job_checklist_id'
   ) THEN
-    EXECUTE 'ALTER TABLE public.job_checklist_items ALTER COLUMN job_checklist_id SET DEFAULT gen_random_uuid()';
-    EXECUTE 'UPDATE public.job_checklist_items SET job_checklist_id = gen_random_uuid() WHERE job_checklist_id IS NULL';
+    EXECUTE 'ALTER TABLE public.job_checklist_items ALTER COLUMN job_checklist_id DROP DEFAULT';
+    EXECUTE 'ALTER TABLE public.job_checklist_items ALTER COLUMN job_checklist_id DROP NOT NULL';
   END IF;
 END$$;
 

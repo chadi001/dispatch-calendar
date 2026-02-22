@@ -1547,69 +1547,6 @@ async function runJobActionRpc(fn, payload){
   }
 }
 
-const CANCEL_REASON_OPTIONS = [
-  { code:'client_request', label:'Client request' },
-  { code:'no_access', label:'No access' },
-  { code:'traffic_driving', label:'Traffic / driving' },
-  { code:'too_far', label:'Too far' },
-  { code:'parts_missing', label:'Parts missing' },
-  { code:'weather', label:'Weather' },
-  { code:'other', label:'Other' }
-];
-
-function pickCancelReason(){
-  return new Promise((resolve)=>{
-    const modal = document.createElement('div');
-    modal.className = 'modal';
-
-    const optionHtml = CANCEL_REASON_OPTIONS
-      .map(o=>`<option value="${o.code}">${o.label}</option>`)
-      .join('');
-
-    modal.innerHTML = `
-      <div class="modal-backdrop"></div>
-      <div class="modal-dialog" style="max-width:520px;">
-        <div class="modal-header">
-          <div class="modal-title">Cancel job</div>
-        </div>
-        <div class="modal-body" style="max-height:none;overflow:visible;display:flex;flex-direction:column;gap:10px;">
-          <label for="cancelReasonSelect" style="font-size:13px;font-weight:800;color:#334155;">Cancel reason</label>
-          <select id="cancelReasonSelect" style="min-width:0;width:100%;">
-            ${optionHtml}
-          </select>
-          <label for="cancelReasonNote" style="font-size:13px;font-weight:800;color:#334155;">Optional note</label>
-          <input id="cancelReasonNote" type="text" placeholder="Add details (optional)" style="height:38px;border:1px solid #d1d5db;border-radius:10px;padding:0 10px;"/>
-          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px;">
-            <button type="button" class="edbtn secondary" id="cancelReasonDismiss">Close</button>
-            <button type="button" class="edbtn" id="cancelReasonConfirm">Confirm cancel</button>
-          </div>
-        </div>
-      </div>`;
-
-    const close = (result)=>{
-      try{ modal.remove(); }catch(e){}
-      resolve(result);
-    };
-
-    const sel = modal.querySelector('#cancelReasonSelect');
-    const note = modal.querySelector('#cancelReasonNote');
-    modal.querySelector('#cancelReasonDismiss').onclick = ()=>close(null);
-    modal.querySelector('#cancelReasonConfirm').onclick = ()=>{
-      const reasonCode = String(sel?.value || '').trim();
-      if(!reasonCode){
-        alert('Cancel reason is required.');
-        return;
-      }
-      close({ reasonCode, reasonNote: String(note?.value || '').trim() });
-    };
-    const backdrop = modal.querySelector('.modal-backdrop');
-    if(backdrop) backdrop.onclick = ()=>close(null);
-
-    document.body.appendChild(modal);
-    if(note) setTimeout(()=>note.focus(), 0);
-  });
-}
-
 function statusChipText(status){
   const s = String(status||'scheduled').toLowerCase();
   if(s==='in_progress') return 'IN PROGRESS';
@@ -1730,9 +1667,7 @@ function openDrawer(drawer, title, items, iso){
       meta.appendChild(el('div',{class:'small'}, `Cancel reason: ${it.cancel_reason_code}${it.cancel_reason_note ? ' - '+it.cancel_reason_note : ''}`));
     }
 
-    const checklistBox = el('div',{class:'small'});
-    checklistBox.textContent = 'Checklist: loading...';
-    meta.appendChild(checklistBox);
+    meta.appendChild(el('div',{class:'small'}, 'Execution + checklist are available on Onsite page only.'));
 
     const controls = document.createElement('div');
     controls.className='edit';
@@ -1783,171 +1718,24 @@ function openDrawer(drawer, title, items, iso){
     grp2.appendChild(plageSel);
     planningBody.appendChild(grp2);
 
-    // Status group (execution controls)
+    // Onsite execution entry point (calendar stays clean)
     const grpS = document.createElement('div');
     grpS.className='edgrp';
     const lblS = document.createElement('div');
     lblS.className='edlbl';
-    lblS.textContent='Execution';
+    lblS.textContent='Onsite execution';
     const actionsS = document.createElement('div');
     actionsS.className='edactions';
 
-    const statusNow = String(it.status || (isCancelled ? 'cancelled' : 'scheduled')).toLowerCase();
-    const canExec = canExecuteJobItem(it);
     const dbId = String(it._db_id || it.id || '').trim();
-
-    const renderChecklist = async ()=>{
-      if(!dbId || !window.sb){
-        checklistBox.textContent = 'Checklist: unavailable';
-        return;
-      }
-      const seeded = await runJobActionRpc('ensure_job_checklist', { p_job_id: dbId });
-      if(!seeded.ok){
-        checklistBox.textContent = 'Checklist: not available';
-        return;
-      }
-      const { data, error } = await window.sb
-        .from('job_checklist_items')
-        .select('id,title,is_required,completed')
-        .eq('job_id', dbId)
-        .order('sort_order', { ascending:true });
-      if(error){
-        checklistBox.textContent = 'Checklist: load failed';
-        return;
-      }
-      const rows = Array.isArray(data) ? data : [];
-      if(!rows.length){
-        checklistBox.textContent = 'Checklist: no items';
-        return;
-      }
-      checklistBox.innerHTML = '';
-      const title = el('div',{class:'small'}, 'Checklist');
-      title.style.fontWeight = '700';
-      checklistBox.appendChild(title);
-      for(const rowItem of rows){
-        const line = document.createElement('label');
-        line.className = 'small';
-        line.style.display = 'flex';
-        line.style.gap = '6px';
-        line.style.alignItems = 'center';
-        const cb = document.createElement('input');
-        cb.type = 'checkbox';
-        cb.checked = !!rowItem.completed;
-        cb.disabled = !canExec;
-        cb.onchange = async ()=>{
-          const out = await runJobActionRpc('tech_toggle_checklist_item', { p_item_id: rowItem.id, p_completed: !!cb.checked });
-          if(!out.ok){
-            cb.checked = !cb.checked;
-            alert('Checklist update failed: ' + out.error);
-            return;
-          }
-        };
-        line.appendChild(cb);
-        line.appendChild(document.createTextNode(String(rowItem.title||'') + (rowItem.is_required ? ' *' : '')));
-        checklistBox.appendChild(line);
-      }
-    };
-
-    const refreshAfterExecution = async ()=>{
-      await dbBootstrapJobsIntoPayload();
-      rerenderActive();
-      try{
-        const midOpen = String(parseInt(iso.slice(5,7),10));
-        const mmOpen = payload.months[midOpen];
-        const refreshed = itemsForDate(mmOpen, iso, currentFilters());
-        openDrawer(drawer, `Jobs for ${iso} (${refreshed.length})`, refreshed, iso);
-      }catch(e){}
-    };
-
-    const btnStart = document.createElement('button');
-    btnStart.type='button';
-    btnStart.className='edbtn secondary';
-    btnStart.textContent='Start';
-    btnStart.disabled = !canExec || !dbId || statusNow==='completed';
-    btnStart.onclick = async ()=>{
-      const r = await runJobActionRpc('tech_start_job', { p_job_id: dbId, p_note: null });
-      if(!r.ok){ alert('Start failed: ' + r.error); return; }
-      if(getAutoOpenOnsite() && dbId){
-        try{ window.open(`onsite-install.html?job_id=${encodeURIComponent(dbId)}`,'_blank'); }catch(e){}
-      }
-      await refreshAfterExecution();
-    };
-    actionsS.appendChild(btnStart);
 
     const btnOnsite = document.createElement('button');
     btnOnsite.type='button';
-    btnOnsite.className='edbtn secondary';
+    btnOnsite.className='edbtn';
     btnOnsite.textContent='Onsite page';
     btnOnsite.disabled = !dbId;
     btnOnsite.onclick = ()=>window.open(`onsite-install.html?job_id=${encodeURIComponent(dbId)}`,'_blank');
     actionsS.appendChild(btnOnsite);
-
-    const btnEnd = document.createElement('button');
-    btnEnd.type='button';
-    btnEnd.className='edbtn secondary';
-    btnEnd.textContent='End session';
-    btnEnd.disabled = !canExec || !dbId;
-    btnEnd.onclick = async ()=>{
-      const r = await runJobActionRpc('tech_end_work_session', { p_job_id: dbId, p_note: null });
-      if(!r.ok){ alert('End session failed: ' + r.error); return; }
-      await refreshAfterExecution();
-    };
-    actionsS.appendChild(btnEnd);
-
-    const btnDone = document.createElement('button');
-    btnDone.type='button';
-    btnDone.className='edbtn';
-    btnDone.textContent='Mark complete';
-    btnDone.disabled = !canExec || !dbId || statusNow==='completed';
-    btnDone.onclick = async ()=>{
-      if(!confirm('Mark this job as completed?')) return;
-      const r = await runJobActionRpc('tech_mark_job_completed', { p_job_id: dbId, p_note: null });
-      if(!r.ok){ alert('Complete failed: ' + r.error); return; }
-      await refreshAfterExecution();
-    };
-    actionsS.appendChild(btnDone);
-
-    const btnCancel = document.createElement('button');
-    btnCancel.type='button';
-    btnCancel.className='edbtn ' + (isCancelled ? 'secondary' : '');
-    btnCancel.textContent = isCancelled ? 'Restore' : 'Cancel';
-    btnCancel.disabled = !canExec;
-    btnCancel.onclick = async ()=>{
-      const msg = isCancelled
-        ? 'Confirm restore this cancelled job?'
-        : 'Confirm cancel this job? It will be hidden unless Show cancelled is enabled.';
-      if(!confirm(msg)) return;
-
-      if(dbId && window.sb){
-        let reasonCode = null;
-        let reasonNote = null;
-        if(!isCancelled){
-          const cancelMeta = await pickCancelReason();
-          if(!cancelMeta) return;
-          reasonCode = cancelMeta.reasonCode;
-          reasonNote = cancelMeta.reasonNote;
-        }
-        const r = await runJobActionRpc('tech_set_job_cancelled', {
-          p_job_id: dbId,
-          p_cancelled: !isCancelled,
-          p_reason_code: reasonCode,
-          p_reason_note: reasonNote
-        });
-        if(!r.ok){ alert('Cancel/restore failed: ' + r.error); return; }
-        delete cancelOverrides[k];
-        saveOverrides();
-        await refreshAfterExecution();
-      }else{
-        if(!window.CAN_EDIT){ alert('Admin only for local jobs.'); return; }
-        setManualLock(k);
-        if(isCancelled) delete cancelOverrides[k];
-        else cancelOverrides[k] = true;
-        saveOverrides();
-        rerenderActive();
-      }
-    };
-    actionsS.appendChild(btnCancel);
-    renderChecklist();
 
     grpS.appendChild(lblS);
     grpS.appendChild(actionsS);
