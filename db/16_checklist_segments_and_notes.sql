@@ -1,27 +1,7 @@
--- Hotfix: legacy checklist schema + richer onsite checklist protocol
+-- Checklist update: remove MCN-only tail and add tech notes RPC
 begin;
 
--- 1) Legacy compatibility: some environments have legacy job_checklist_id from old model
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_schema='public'
-      AND table_name='job_checklist_items'
-      AND column_name='job_checklist_id'
-  ) THEN
-    EXECUTE 'ALTER TABLE public.job_checklist_items ALTER COLUMN job_checklist_id DROP DEFAULT';
-    EXECUTE 'ALTER TABLE public.job_checklist_items ALTER COLUMN job_checklist_id DROP NOT NULL';
-  END IF;
-END$$;
-
--- 2) Ensure postal_code field exists for dispatch visibility
-ALTER TABLE IF EXISTS public.jobs
-  ADD COLUMN IF NOT EXISTS postal_code text;
-
--- 3) Rich standardized checklist protocol (arrival -> delivery -> exit)
-CREATE OR REPLACE FUNCTION public.ensure_job_checklist(p_job_id uuid)
+create or replace function public.ensure_job_checklist(p_job_id uuid)
 returns int
 language plpgsql
 security definer
@@ -38,7 +18,6 @@ begin
     return 0;
   end if;
 
-  -- Shared protocol for all jobs (arrival + closeout discipline)
   insert into public.job_checklist_items(job_id, sort_order, title, is_required)
   values
     (p_job_id, 10, 'Park vehicle safely and according to site/customer rules', true),
@@ -62,6 +41,37 @@ begin
 end;
 $$;
 
+create or replace function public.tech_add_job_note(p_job_id uuid, p_note text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_actor text;
+  v_clean text;
+begin
+  if not public.can_access_job(p_job_id) then
+    raise exception 'access denied';
+  end if;
+
+  v_clean := nullif(trim(coalesce(p_note,'')), '');
+  if v_clean is null then
+    raise exception 'note is required';
+  end if;
+
+  v_actor := coalesce(public.current_tech_name(), '');
+
+  insert into public.job_events(job_id, event_type, notes, actor_user_id, actor_tech_name)
+  values (p_job_id, 'tech_note', v_clean, auth.uid(), nullif(v_actor,''));
+end;
+$$;
+
+delete from public.job_checklist_items
+where title like 'MCN:%'
+   or sort_order >= 160;
+
 grant execute on function public.ensure_job_checklist(uuid) to authenticated;
+grant execute on function public.tech_add_job_note(uuid, text) to authenticated;
 
 commit;

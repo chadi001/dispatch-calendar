@@ -25,6 +25,11 @@
     .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
     .check{margin-top:8px;padding-top:8px;border-top:1px dashed #cbd5e1}
     .check label{display:flex;gap:6px;align-items:center;margin:4px 0;font-size:13px}
+    .seg{margin-top:8px}
+    .segTitle{font-size:12px;font-weight:800;letter-spacing:.3px;color:#334155;text-transform:uppercase;border-bottom:1px solid #e2e8f0;padding-bottom:3px;margin-bottom:4px}
+    .noteBox{margin-top:10px;padding-top:8px;border-top:1px dashed #cbd5e1}
+    .noteLabel{display:block;font-size:12px;font-weight:700;color:#334155;margin-bottom:4px}
+    .noteInput{width:100%;min-height:90px;border:1px solid #cbd5e1;border-radius:10px;padding:8px 10px;font:inherit;resize:vertical;background:#fff}
   </style>
 </head>
 <body>
@@ -66,9 +71,33 @@ async function resolveTechName(){
 
 async function loadChecklist(jobId){
   await rpc('ensure_job_checklist', { p_job_id: jobId });
-  const { data, error } = await sb.from('job_checklist_items').select('id,title,is_required,completed').eq('job_id',jobId).order('sort_order',{ascending:true});
+  const { data, error } = await sb.from('job_checklist_items').select('id,title,is_required,completed,sort_order').eq('job_id',jobId).order('sort_order',{ascending:true});
   if(error) return [];
   return data||[];
+}
+
+function checklistSegment(sortOrder){
+  const n = Number(sortOrder||0);
+  if(n<=50) return '1. Arrival and safety';
+  if(n<=100) return '2. Installation and validation';
+  return '3. Closeout and departure';
+}
+
+function buildChecklistHtml(ck){
+  if(!ck.length) return '<div class="small">No checklist items</div>';
+  let html = '';
+  let current = '';
+  for(const it of ck){
+    const seg = checklistSegment(it.sort_order);
+    if(seg !== current){
+      if(current) html += '</div>';
+      current = seg;
+      html += `<div class="seg"><div class="segTitle">${esc(seg)}</div>`;
+    }
+    html += `<label><input type="checkbox" data-item="${it.id}" ${it.completed?'checked':''}/> ${esc(it.title)}${it.is_required?' *':''}</label>`;
+  }
+  if(current) html += '</div>';
+  return html;
 }
 
 async function loadJobs(){
@@ -88,7 +117,7 @@ async function loadJobs(){
     card.className='job';
     const status=(j.status||(j.cancelled?'cancelled':'scheduled')).toLowerCase();
     const ck=await loadChecklist(j.id);
-    const ckHtml = ck.map(it=>`<label><input type="checkbox" data-item="${it.id}" ${it.completed?'checked':''}/> ${esc(it.title)}${it.is_required?' *':''}</label>`).join('') || '<div class="small">No checklist items</div>';
+    const ckHtml = buildChecklistHtml(ck);
     card.innerHTML=`
       <div class="h">
         <div><b>${esc(j.client||'')}</b> | ${esc(j.wo||j.site||'')}</div>
@@ -105,6 +134,13 @@ async function loadJobs(){
         <button data-act="cancel">${status==='cancelled'?'Restore':'Cancel'}</button>
       </div>
       <div class="check">${ckHtml}</div>
+      <div class="noteBox">
+        <label class="noteLabel" for="note-${j.id}">Important note (long text)</label>
+        <textarea class="noteInput" id="note-${j.id}" placeholder="Write important details for manager / next tech..."></textarea>
+        <div class="row">
+          <button data-act="save-note">Save note</button>
+        </div>
+      </div>
     `;
 
     card.querySelectorAll('input[type="checkbox"][data-item]').forEach(cb=>cb.addEventListener('change', async ()=>{
@@ -115,6 +151,14 @@ async function loadJobs(){
     card.querySelector('[data-act="start"]').onclick=async()=>{ const out=await rpc('tech_start_job',{p_job_id:j.id,p_note:null}); if(!out.ok) return alert(out.error); await loadJobs(); };
     card.querySelector('[data-act="end"]').onclick=async()=>{ const out=await rpc('tech_end_work_session',{p_job_id:j.id,p_note:null}); if(!out.ok) return alert(out.error); await loadJobs(); };
     card.querySelector('[data-act="done"]').onclick=async()=>{ if(!confirm('Mark completed?')) return; const out=await rpc('tech_mark_job_completed',{p_job_id:j.id,p_note:null}); if(!out.ok) return alert(out.error); await loadJobs(); };
+    card.querySelector('[data-act="save-note"]').onclick=async()=>{
+      const txt = String(card.querySelector(`#note-${j.id}`)?.value || '').trim();
+      if(!txt) return alert('Please write a note first.');
+      const out = await rpc('tech_add_job_note', { p_job_id:j.id, p_note:txt });
+      if(!out.ok) return alert(out.error || 'Failed to save note');
+      card.querySelector(`#note-${j.id}`).value = '';
+      alert('Note saved.');
+    };
     card.querySelector('[data-act="cancel"]').onclick=async()=>{
       const doCancel = status!=='cancelled';
       if(doCancel){
