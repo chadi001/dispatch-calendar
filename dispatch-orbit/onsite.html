@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Dispatch Orbit - Onsite</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="app.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <div class="orb-bg"></div>
+  <header class="topbar shell">
+    <div>
+      <h1>Onsite Workflow</h1>
+      <p class="sub">Execution only: start, end, complete, cancel</p>
+    </div>
+    <div class="top-actions">
+      <a class="btn ghost" href="index.html">Calendar</a>
+      <a class="btn ghost" href="dashboard.html">KPI</a>
+      <button id="btnLogout" class="btn ghost" type="button" style="display:none">Sign out</button>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="card auth-card">
+      <form id="loginForm" class="auth-grid">
+        <input id="email" type="email" placeholder="Email" required />
+        <input id="password" type="password" placeholder="Password" required />
+        <button class="btn" type="submit">Sign in</button>
+      </form>
+      <div id="authStatus" class="muted">Not signed in</div>
+    </section>
+
+    <section class="card filters">
+      <label>Date range
+        <select id="dateMode">
+          <option value="today">Today</option>
+          <option value="all">All</option>
+        </select>
+      </label>
+      <button id="btnReload" class="btn ghost" type="button">Reload</button>
+    </section>
+
+    <section id="jobs" class="onsite-list"></section>
+  </main>
+
+  <script src="onsite.js"></script>
+</body>
+</html>

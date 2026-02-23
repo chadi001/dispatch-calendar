@@ -53,7 +53,7 @@
 const SUPABASE_URL = 'https://mycgdissxzsizoywcwps.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15Y2dkaXNzeHpzaXpveXdjd3BzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxNzkyNDEsImV4cCI6MjA4NTc1NTI0MX0.1-3qDwNwFeqlHjn-jCACOtV5U2yhgEsQ1yUM-m2TKZg';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storageKey:'dispatch-auth-v1'} });
-let me = { user:null, techName:'', isAdmin:false };
+let me = { user:null, techName:'', techNames:[], isAdmin:false };
 const jobFocusId = new URLSearchParams(location.search).get('job_id') || '';
 
 function todayIso(){ return new Date().toISOString().slice(0,10); }
@@ -68,6 +68,32 @@ async function resolveTechName(){
   if(!uid) return '';
   const { data } = await sb.from('tech_name_map').select('tech_name').eq('user_id',uid).eq('is_active',true).maybeSingle();
   return data?.tech_name || '';
+}
+
+async function resolveTechNames(){
+  const out = [];
+  const add = (v)=>{ const s=String(v||'').trim(); if(!s) return; if(!out.some(x=>x.toLowerCase()===s.toLowerCase())) out.push(s); };
+  try{ const v = await resolveTechName(); if(v) add(v); }catch(e){}
+  const uid = me.user?.id;
+  if(uid){
+    try{
+      const { data } = await sb.from('tech_name_map').select('tech_name').eq('user_id',uid).eq('is_active',true);
+      (data||[]).forEach(r=>add(r?.tech_name));
+    }catch(e){}
+  }
+  return out;
+}
+
+async function loadMyAssignedJobIds(){
+  const names = Array.isArray(me.techNames) ? me.techNames.filter(Boolean) : [];
+  if(!names.length) return new Set();
+  try{
+    const { data, error } = await sb.from('job_assignments').select('job_id,tech_name').in('tech_name', names);
+    if(error || !Array.isArray(data)) return new Set();
+    return new Set(data.map(x=>String(x.job_id||'')).filter(Boolean));
+  }catch(e){
+    return new Set();
+  }
 }
 
 async function loadChecklist(jobId){
@@ -159,9 +185,16 @@ async function loadJobs(){
   }
   if(error){ host.innerHTML='<div class="small">Load failed: '+esc(error.message)+'</div>'; return; }
   const dateMode=document.getElementById('dateMode').value;
+  const meSet = new Set((me.techNames||[]).map(v=>String(v||'').trim().toLowerCase()).filter(Boolean));
+  const extraAssigned = me.isAdmin ? new Set() : await loadMyAssignedJobIds();
   data = (data||[]).filter(j=>{
     if(jobFocusId && j.id!==jobFocusId) return false;
     if(!jobFocusId && dateMode==='today' && String(j.job_date||'')!==todayIso()) return false;
+    if(!me.isAdmin){
+      const own = meSet.has(String(j.tech_name||'').trim().toLowerCase());
+      const team = extraAssigned.has(String(j.id||''));
+      if(!own && !team) return false;
+    }
     return true;
   });
   if(!data?.length){ host.innerHTML='<div class="small">No jobs.</div>'; return; }
@@ -239,8 +272,9 @@ async function afterSignIn(){
   if(!user) return;
   const { data: adminRow } = await sb.from('admin_users').select('user_id').eq('user_id', user.id).maybeSingle();
   me.isAdmin = !!adminRow;
-  me.techName = await resolveTechName();
-  document.getElementById('authStatus').textContent = `Signed in: ${user.email||''} ${me.isAdmin?'(admin)':''} ${me.techName?'- '+me.techName:''}`;
+  me.techNames = await resolveTechNames();
+  me.techName = me.techNames[0] || '';
+  document.getElementById('authStatus').textContent = `Signed in: ${user.email||''} ${me.isAdmin?'(admin)':''} ${me.techNames.length?'- '+me.techNames.join(', '):''}`;
   const f=document.getElementById('jobFocusInfo');
   if(f) f.textContent = jobFocusId ? `Focused job: ${jobFocusId}` : '';
   const dm=document.getElementById('dateMode');

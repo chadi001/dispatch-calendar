@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Dispatch Orbit - Calendar</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="app.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <div class="orb-bg"></div>
+  <header class="topbar shell">
+    <div>
+      <h1>Dispatch Orbit</h1>
+      <p class="sub">V2 clean-room calendar preview</p>
+    </div>
+    <div class="top-actions">
+      <a class="btn ghost" href="dashboard.html">KPI</a>
+      <a class="btn" href="onsite.html">Onsite</a>
+      <button id="btnLogout" class="btn ghost" type="button" style="display:none">Sign out</button>
+    </div>
+  </header>
+
+  <main class="shell layout">
+    <section class="card auth-card" id="authCard">
+      <form id="loginForm" class="auth-grid">
+        <input id="email" type="email" placeholder="Email" required />
+        <input id="password" type="password" placeholder="Password" required />
+        <button class="btn" type="submit">Sign in</button>
+      </form>
+      <div id="authStatus" class="muted">Not signed in</div>
+    </section>
+
+    <section class="card month-strip" id="monthStrip">
+      <div class="muted" style="margin-bottom:6px">Month</div>
+      <div id="monthTabs" class="month-tabs"></div>
+    </section>
+
+    <section class="card search-zone" id="searchZone">
+      <label>Work order
+        <div class="inline-search">
+          <input id="woSearch" type="text" placeholder="Search WO" />
+          <button id="btnFindWo" class="btn ghost" type="button">Find/Edit</button>
+        </div>
+      </label>
+      <button id="btnReload" class="btn ghost" type="button">Reload</button>
+    </section>
+
+    <section class="card filter-zone" id="filterZone">
+      <div class="filter-title">Filters</div>
+      <div class="filter-grid">
+        <label>Client
+          <select id="clientFilter">
+            <option value="ALL">All</option>
+          </select>
+        </label>
+        <label>Status
+          <select id="statusFilter">
+            <option value="ALL">All</option>
+            <option value="scheduled">Scheduled</option>
+            <option value="in_progress">In progress</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="on_hold">On hold</option>
+          </select>
+        </label>
+        <label>Tech
+          <select id="techFilter">
+            <option value="ALL">All</option>
+          </select>
+        </label>
+        <label>Administrative region
+          <select id="regionFilter">
+            <option value="ALL">All</option>
+          </select>
+        </label>
+        <label>Group
+          <select id="groupFilter">
+            <option value="ALL">All</option>
+            <option value="SOLO">Solo</option>
+            <option value="TEAM">Team (2+)</option>
+          </select>
+        </label>
+        <label>Assignment
+          <select id="unassignedFilter">
+            <option value="ALL">All jobs</option>
+            <option value="UNASSIGNED_ONLY">Unassigned only</option>
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <section class="calendar-wrap card">
+      <div class="week-head">
+        <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+      </div>
+      <div id="calendarGrid" class="calendar-grid"></div>
+    </section>
+
+    <aside class="card day-panel">
+      <div class="day-head">
+        <h3 id="dayTitle">Select a date</h3>
+        <button id="btnClearDay" class="btn ghost" type="button">Close</button>
+      </div>
+      <div id="dayList" class="day-list muted">No jobs selected.</div>
+    </aside>
+
+    <section class="card weekly-wrap">
+      <h3 id="weeklyTitle">Weekly view</h3>
+      <div id="weeklyHost" class="weekly-host"></div>
+    </section>
+  </main>
+
+  <div id="editModal" class="modal-shell" style="display:none">
+    <div class="modal-card">
+      <h3>Edit job</h3>
+      <div class="muted" id="editTitle"></div>
+      <div class="modal-grid">
+        <label>Date<input id="editDate" type="date" /></label>
+        <label>Slot
+          <select id="editSlot"><option value="AM">AM</option><option value="PM">PM</option></select>
+        </label>
+        <label>Status
+          <select id="editStatus">
+            <option value="scheduled">Scheduled</option>
+            <option value="in_progress">In progress</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="on_hold">On hold</option>
+          </select>
+        </label>
+        <label>Client<input id="editClient" type="text" /></label>
+        <label>City<input id="editCity" type="text" /></label>
+        <label>Postal<input id="editPostal" type="text" /></label>
+        <label style="grid-column:1/-1">Address<input id="editAddress" type="text" /></label>
+      </div>
+      <div class="onsite-actions">
+        <button class="btn ghost" id="btnCloseEdit" type="button">Close</button>
+        <button class="btn" id="btnSaveEdit" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -2134,6 +2134,16 @@ function makePanel(mid, m){
 
         a.addEventListener('click',(ev)=>{
           if(ev.button===0 && !ev.ctrlKey && !ev.metaKey){
+            if(ev.shiftKey){
+              ev.preventDefault();
+              clearSelected(panel);
+              a.classList.add('selected');
+              openDrawer(drawer, `Jobs for ${iso} (${items.length})`, items, iso);
+              drawer.scrollIntoView({behavior:'smooth', block:'start'});
+              return;
+            }
+            // Default click: open HQ -> destination route in Maps.
+            if(route && route !== '#') return;
             ev.preventDefault();
             clearSelected(panel);
             a.classList.add('selected');

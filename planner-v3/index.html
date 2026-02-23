@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dispatch Planner V3</title>
+  <script>
+    (function(){
+      var s=document.createElement('script');
+      s.src='https://unpkg.com/@supabase/supabase-js@2';
+      s.onerror=function(){
+        var s2=document.createElement('script');
+        s2.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+        s2.onerror=function(){ alert('Failed to load Supabase library.'); };
+        document.head.appendChild(s2);
+      };
+      document.head.appendChild(s);
+    })();
+  </script>
+  <style>
+    :root{
+      --bg:#f3f5f7;
+      --surface:#ffffff;
+      --ink:#16212d;
+      --muted:#5f6b76;
+      --accent:#0f766e;
+      --line:#d9e1e7;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:Segoe UI,Tahoma,sans-serif;background:linear-gradient(180deg,#f6f9fb 0%,#eef3f7 100%);color:var(--ink)}
+    .wrap{max-width:1200px;margin:0 auto;padding:20px}
+    .hero{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;display:flex;justify-content:space-between;gap:20px;align-items:flex-start}
+    .hero h1{margin:0 0 6px;font-size:28px}
+    .hero p{margin:0;color:var(--muted)}
+    .badge{padding:8px 12px;border-radius:999px;background:#e6fffb;color:#0b5f58;border:1px solid #9adfd8;font-weight:600}
+    .grid{display:grid;grid-template-columns:1.3fr 1fr;gap:14px;margin-top:14px}
+    .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px}
+    .card h2{margin:0 0 10px;font-size:18px}
+    .row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+    .btn{border:1px solid var(--line);background:#fff;padding:10px 12px;border-radius:10px;font-weight:600;cursor:pointer}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+    .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+    .input{border:1px solid var(--line);border-radius:10px;padding:9px 10px;background:#fff;min-width:160px}
+    .muted{color:var(--muted)}
+    .table{width:100%;border-collapse:collapse}
+    .table th,.table td{border-bottom:1px solid var(--line);padding:8px;text-align:left;font-size:13px}
+    .pill{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:700}
+    .pending{background:#fff7e8;color:#8a5800}
+    .approved{background:#e6f7ed;color:#1d6b35}
+    .rejected{background:#ffe8e8;color:#8d2222}
+    .published{background:#e3f2fd;color:#0c4a6e}
+    .stage{display:grid;gap:8px}
+    .stage div{border:1px dashed var(--line);background:#fbfdff;border-radius:10px;padding:10px}
+    .status{font-size:13px;border:1px solid var(--line);background:#f8fbff;border-radius:10px;padding:10px;white-space:pre-wrap}
+    @media (max-width:900px){.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <div>
+        <h1>Dispatch Planner V3</h1>
+        <p>Separate planning app for optimization + GOCO approval cycles.</p>
+      </div>
+      <span class="badge" id="authBadge">Connecting...</span>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Planning Run</h2>
+        <div class="row">
+          <input id="runName" class="input" value="GOCO-MCN Pilot" placeholder="Run name" />
+          <input id="runYear" class="input" type="number" min="2025" max="2100" value="2026" />
+          <button id="btnCreateRun" class="btn primary">Create Run + Round 1</button>
+        </div>
+        <div class="row">
+          <input id="versionId" class="input" placeholder="Version UUID" style="min-width:320px" />
+          <input id="dateFrom" class="input" type="date" value="2026-01-01" />
+          <input id="dateTo" class="input" type="date" value="2026-03-31" />
+          <input id="clientFilter" class="input" placeholder="Client filter (optional)" />
+          <button id="btnSeed" class="btn">Seed from Live Jobs</button>
+          <button id="btnApplyConstraints" class="btn">Apply Constraints</button>
+        </div>
+        <p class="muted">GOCO keeps suggested dates unless conflict. MCN can optimize by region and route.</p>
+        <table class="table">
+          <thead>
+            <tr><th>Version</th><th>Round</th><th>Status</th><th>Total</th><th>GOCO</th><th>Approved</th><th>Pending</th></tr>
+          </thead>
+          <tbody id="versionTableBody">
+            <tr><td colspan="7" class="muted">No planner versions loaded.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <h2>Constraint Profile</h2>
+        <div class="row">
+          <input id="cId" type="hidden" />
+          <input id="cTech" class="input" placeholder="Tech name" />
+          <input id="cClients" class="input" placeholder="Clients (GOCO,MCN,ALL)" style="min-width:220px" />
+          <select id="cMobility" class="input">
+            <option value="flex">Mobility: Flex</option>
+            <option value="preferred">Mobility: Preferred</option>
+            <option value="strict">Mobility: Strict</option>
+          </select>
+          <input id="cRegion" class="input" placeholder="Region scope (optional)" style="min-width:200px" />
+        </div>
+        <div class="row">
+          <input id="cGocoCap" class="input" type="number" min="0" max="8" value="2" title="GOCO max/day" />
+          <input id="cTotalCap" class="input" type="number" min="0" max="8" value="2" title="Total max/day" />
+          <input id="cMcnTeam" class="input" type="number" min="1" max="4" value="2" title="MCN team default" />
+          <input id="cRank" class="input" type="number" min="1" max="999" value="100" title="Fallback rank" />
+          <label class="muted" style="display:flex;align-items:center;gap:6px"><input id="cActive" type="checkbox" checked /> Active</label>
+        </div>
+        <div class="row">
+          <button id="btnSaveConstraint" class="btn primary">Save Constraint</button>
+          <button id="btnResetConstraint" class="btn">Reset Form</button>
+          <button id="btnLoadConstraints" class="btn">Refresh Constraints</button>
+        </div>
+        <table class="table">
+          <thead>
+            <tr><th>Tech</th><th>Clients</th><th>Mobility</th><th>Region</th><th>GOCO/day</th><th>Total/day</th><th>MCN team</th><th>Rank</th><th>State</th><th>Action</th></tr>
+          </thead>
+          <tbody id="constraintsBody">
+            <tr><td colspan="10" class="muted">No constraints loaded.</td></tr>
+          </tbody>
+        </table>
+        <div class="stage" style="margin-top:10px">
+          <div>Constraint profile is DB-backed and shared across admins.</div>
+        </div>
+      </section>
+    </div>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Approval Cycle (GOCO)</h2>
+        <div class="row">
+          <button class="btn" disabled>Export Proposal CSV</button>
+          <button class="btn" disabled>Import GOCO Decisions</button>
+          <button id="btnPublishApproved" class="btn primary">Publish Approved Only</button>
+        </div>
+        <p class="muted">Rejected dates remain in draft and move to next cycle. Approved jobs are frozen in next run.</p>
+      </section>
+
+      <section class="card">
+        <h2>Publish Gate</h2>
+        <p class="muted">Only approved versions can publish to live dispatch.</p>
+        <div class="row">
+          <button id="btnLoadVersions" class="btn">Refresh Versions</button>
+          <button id="btnPublishInternal" class="btn primary">Publish Approved + Internal</button>
+        </div>
+        <div id="statusBox" class="status">Ready.</div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    window.SUPABASE_URL = 'https://mycgdissxzsizoywcwps.supabase.co';
+    window.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im15Y2dkaXNzeHpzaXpveXdjd3BzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxNzkyNDEsImV4cCI6MjA4NTc1NTI0MX0.1-3qDwNwFeqlHjn-jCACOtV5U2yhgEsQ1yUM-m2TKZg';
+
+    let sb = null;
+    let isAdmin = false;
+
+    function byId(id){ return document.getElementById(id); }
+    function setStatus(msg){ const box=byId('statusBox'); if(box) box.textContent=String(msg||''); }
+    function setAuthBadge(msg){ const b=byId('authBadge'); if(b) b.textContent=msg; }
+
+    function statusPill(status){
+      const s = String(status||'').toLowerCase();
+      if(s==='published') return '<span class="pill published">Published</span>';
+      if(s==='approved') return '<span class="pill approved">Approved</span>';
+      if(s==='rejected') return '<span class="pill rejected">Rejected</span>';
+      return '<span class="pill pending">'+(status||'Draft')+'</span>';
+    }
+
+    function selectedVersionId(){
+      return String(byId('versionId')?.value||'').trim();
+    }
+
+    function esc(s){
+      return String(s==null?'':s)
+        .replace(/&/g,'&amp;')
+        .replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;')
+        .replace(/'/g,'&#39;');
+    }
+
+    function parseClients(raw){
+      const list = String(raw||'').split(',').map(x=>x.trim().toUpperCase()).filter(Boolean);
+      return list.length ? Array.from(new Set(list)) : ['ALL'];
+    }
+
+    function resetConstraintForm(){
+      byId('cId').value = '';
+      byId('cTech').value = '';
+      byId('cClients').value = 'ALL';
+      byId('cMobility').value = 'flex';
+      byId('cRegion').value = '';
+      byId('cGocoCap').value = 2;
+      byId('cTotalCap').value = 2;
+      byId('cMcnTeam').value = 2;
+      byId('cRank').value = 100;
+      byId('cActive').checked = true;
+    }
+
+    function fillConstraintForm(r){
+      byId('cId').value = String(r.id||'');
+      byId('cTech').value = String(r.tech_name||'');
+      byId('cClients').value = Array.isArray(r.allowed_clients) ? r.allowed_clients.join(',') : 'ALL';
+      byId('cMobility').value = String(r.mobility_mode||'flex');
+      byId('cRegion').value = String(r.region_scope||'');
+      byId('cGocoCap').value = Number(r.goco_max_per_day||2);
+      byId('cTotalCap').value = Number(r.total_max_per_day||2);
+      byId('cMcnTeam').value = Number(r.mcn_team_default||2);
+      byId('cRank').value = Number(r.fallback_rank||100);
+      byId('cActive').checked = !!r.is_active;
+    }
+
+    async function loadConstraints(){
+      if(!isAdmin) return;
+      const body = byId('constraintsBody');
+      if(body) body.innerHTML = '<tr><td colspan="10" class="muted">Loading...</td></tr>';
+      const { data, error } = await sb
+        .from('planner_tech_constraints')
+        .select('id,tech_name,allowed_clients,mobility_mode,region_scope,goco_max_per_day,total_max_per_day,mcn_team_default,fallback_rank,is_active,updated_at')
+        .order('fallback_rank', { ascending:true })
+        .order('tech_name', { ascending:true });
+      if(error){
+        setStatus('Load constraints failed: '+error.message);
+        if(body) body.innerHTML = '<tr><td colspan="10" class="muted">Load failed.</td></tr>';
+        return;
+      }
+      if(!Array.isArray(data) || !data.length){
+        if(body) body.innerHTML = '<tr><td colspan="10" class="muted">No constraints found.</td></tr>';
+        return;
+      }
+      if(body){
+        body.innerHTML = data.map(r => (
+          '<tr>'+
+          '<td>'+esc(r.tech_name)+'</td>'+
+          '<td>'+esc((r.allowed_clients||[]).join(', '))+'</td>'+
+          '<td>'+esc(r.mobility_mode)+'</td>'+
+          '<td>'+esc(r.region_scope||'-')+'</td>'+
+          '<td>'+Number(r.goco_max_per_day||0)+'</td>'+
+          '<td>'+Number(r.total_max_per_day||0)+'</td>'+
+          '<td>'+Number(r.mcn_team_default||0)+'</td>'+
+          '<td>'+Number(r.fallback_rank||0)+'</td>'+
+          '<td>'+(r.is_active ? 'Active' : 'Inactive')+'</td>'+
+          '<td><button class="btn" data-ce="'+esc(r.id)+'">Edit</button> <button class="btn" data-cd="'+esc(r.id)+'">Delete</button></td>'+
+          '</tr>'
+        )).join('');
+      }
+      body?.querySelectorAll('button[data-ce]')?.forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          const id = btn.getAttribute('data-ce');
+          const row = data.find(x=>String(x.id)===String(id));
+          if(row) fillConstraintForm(row);
+          setStatus('Editing constraint for '+(row?.tech_name||id));
+        });
+      });
+      body?.querySelectorAll('button[data-cd]')?.forEach(btn=>{
+        btn.addEventListener('click', ()=>deleteConstraint(btn.getAttribute('data-cd')));
+      });
+    }
+
+    async function saveConstraint(){
+      if(!isAdmin) return;
+      const id = String(byId('cId').value||'').trim();
+      const tech = String(byId('cTech').value||'').trim();
+      if(!tech){ setStatus('Tech name is required.'); return; }
+      const payload = {
+        tech_name: tech,
+        allowed_clients: parseClients(byId('cClients').value),
+        mobility_mode: String(byId('cMobility').value||'flex'),
+        region_scope: String(byId('cRegion').value||'').trim() || null,
+        goco_max_per_day: Number(byId('cGocoCap').value||2),
+        total_max_per_day: Number(byId('cTotalCap').value||2),
+        mcn_team_default: Number(byId('cMcnTeam').value||2),
+        fallback_rank: Number(byId('cRank').value||100),
+        is_active: !!byId('cActive').checked,
+        updated_at: new Date().toISOString()
+      };
+      let error = null;
+      if(id){
+        ({ error } = await sb.from('planner_tech_constraints').update(payload).eq('id', id));
+      }else{
+        ({ error } = await sb.from('planner_tech_constraints').upsert(payload, { onConflict:'tech_name' }));
+      }
+      if(error){ setStatus('Save constraint failed: '+error.message); return; }
+      setStatus('Constraint saved for '+tech);
+      resetConstraintForm();
+      await loadConstraints();
+    }
+
+    async function deleteConstraint(id){
+      if(!isAdmin || !id) return;
+      if(!confirm('Delete this tech constraint?')) return;
+      const { error } = await sb.from('planner_tech_constraints').delete().eq('id', id);
+      if(error){ setStatus('Delete failed: '+error.message); return; }
+      setStatus('Constraint deleted.');
+      await loadConstraints();
+    }
+
+    async function ensureAdmin(){
+      const { data: userRes } = await sb.auth.getUser();
+      const user = userRes?.user;
+      if(!user){
+        isAdmin = false;
+        setAuthBadge('Not signed in');
+        setStatus('Sign in from V1 first, then open Planner V3.');
+        return false;
+      }
+      const { data, error } = await sb.from('admin_users').select('user_id').eq('user_id', user.id).maybeSingle();
+      if(error){
+        setStatus('Admin check failed: '+error.message);
+        return false;
+      }
+      isAdmin = !!data?.user_id;
+      setAuthBadge(isAdmin ? ('Admin: '+(user.email||user.id)) : ('User: '+(user.email||user.id)));
+      if(!isAdmin) setStatus('Access denied: admin only planner actions.');
+      return isAdmin;
+    }
+
+    async function loadVersions(){
+      if(!isAdmin) return;
+      const body = byId('versionTableBody');
+      if(body) body.innerHTML = '<tr><td colspan="7" class="muted">Loading...</td></tr>';
+      const { data, error } = await sb
+        .from('v_planner_version_status')
+        .select('version_id,round_no,version_status,jobs_total,goco_jobs,approved_jobs,pending_jobs')
+        .order('round_no', { ascending:false })
+        .limit(50);
+      if(error){
+        setStatus('Load versions failed: '+error.message);
+        if(body) body.innerHTML = '<tr><td colspan="7" class="muted">Load failed.</td></tr>';
+        return;
+      }
+      if(!Array.isArray(data) || !data.length){
+        if(body) body.innerHTML = '<tr><td colspan="7" class="muted">No planner versions found.</td></tr>';
+        return;
+      }
+      if(body){
+        body.innerHTML = data.map(v => (
+          '<tr>'+
+          '<td><button class="btn" data-vid="'+v.version_id+'">Use</button> '+v.version_id.slice(0,8)+'...</td>'+
+          '<td>'+v.round_no+'</td>'+
+          '<td>'+statusPill(v.version_status)+'</td>'+
+          '<td>'+Number(v.jobs_total||0)+'</td>'+
+          '<td>'+Number(v.goco_jobs||0)+'</td>'+
+          '<td>'+Number(v.approved_jobs||0)+'</td>'+
+          '<td>'+Number(v.pending_jobs||0)+'</td>'+
+          '</tr>'
+        )).join('');
+      }
+      body?.querySelectorAll('button[data-vid]')?.forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+          byId('versionId').value = btn.getAttribute('data-vid') || '';
+          setStatus('Selected version: '+byId('versionId').value);
+        });
+      });
+    }
+
+    async function createRun(){
+      if(!isAdmin) return;
+      const runName = String(byId('runName').value||'').trim();
+      const runYear = Number(byId('runYear').value||0);
+      if(!runName || !runYear){ setStatus('Run name and year are required.'); return; }
+      const { data: runId, error } = await sb.rpc('planner_create_run', { p_run_name: runName, p_run_year: runYear });
+      if(error){ setStatus('Create run failed: '+error.message); return; }
+      setStatus('Run created: '+runId);
+      await loadVersions();
+    }
+
+    async function seedVersion(){
+      if(!isAdmin) return;
+      const versionId = selectedVersionId();
+      const dateFrom = String(byId('dateFrom').value||'');
+      const dateTo = String(byId('dateTo').value||'');
+      const clientFilter = String(byId('clientFilter').value||'').trim();
+      if(!versionId){ setStatus('Select a version first.'); return; }
+      const args = {
+        p_version_id: versionId,
+        p_date_from: dateFrom,
+        p_date_to: dateTo,
+        p_client_filter: clientFilter || null
+      };
+      const { data, error } = await sb.rpc('planner_seed_version_from_live_jobs', args);
+      if(error){ setStatus('Seed failed: '+error.message); return; }
+      setStatus('Seed completed. Rows imported: '+data);
+      await loadVersions();
+    }
+
+    async function applyConstraints(){
+      if(!isAdmin) return;
+      const versionId = selectedVersionId();
+      if(!versionId){ setStatus('Select a version first.'); return; }
+      const { data, error } = await sb.rpc('planner_apply_constraints', {
+        p_version_id: versionId,
+        p_keep_existing: true
+      });
+      if(error){ setStatus('Apply constraints failed: '+error.message); return; }
+      const row = Array.isArray(data) ? data[0] : data;
+      setStatus(
+        'Constraints applied\n'+
+        '- updated: '+Number(row?.updated_jobs||0)+'\n'+
+        '- unresolved: '+Number(row?.unresolved_jobs||0)
+      );
+      await loadVersions();
+    }
+
+    async function publishVersion(mode){
+      if(!isAdmin) return;
+      const versionId = selectedVersionId();
+      if(!versionId){ setStatus('Select a version first.'); return; }
+      const { data, error } = await sb.rpc('planner_publish_version', { p_version_id: versionId, p_mode: mode });
+      if(error){ setStatus('Publish failed: '+error.message); return; }
+      const row = Array.isArray(data) ? data[0] : data;
+      if(!row){ setStatus('Publish completed.'); return; }
+      setStatus(
+        'Publish done\n'+
+        '- updated: '+Number(row.updated_jobs||0)+'\n'+
+        '- inserted: '+Number(row.inserted_jobs||0)+'\n'+
+        '- skipped: '+Number(row.skipped_jobs||0)+'\n'+
+        '- failed: '+Number(row.failed_jobs||0)
+      );
+      await loadVersions();
+    }
+
+    async function boot(){
+      setStatus('Connecting to Supabase...');
+      while(!window.supabase){
+        await new Promise(r=>setTimeout(r,100));
+      }
+      sb = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY, {
+        auth: { persistSession:true, autoRefreshToken:true, detectSessionInUrl:true, storageKey:'dispatch-auth-v1' }
+      });
+      const ok = await ensureAdmin();
+      if(!ok) return;
+      setStatus('Connected. Use Create Run, Seed, and Publish actions.');
+      await loadVersions();
+      await loadConstraints();
+    }
+
+    byId('btnCreateRun').addEventListener('click', createRun);
+    byId('btnSeed').addEventListener('click', seedVersion);
+    byId('btnApplyConstraints').addEventListener('click', applyConstraints);
+    byId('btnLoadVersions').addEventListener('click', loadVersions);
+    byId('btnPublishApproved').addEventListener('click', ()=>publishVersion('approved_only'));
+    byId('btnPublishInternal').addEventListener('click', ()=>publishVersion('approved_and_internal'));
+    byId('btnSaveConstraint').addEventListener('click', saveConstraint);
+    byId('btnResetConstraint').addEventListener('click', resetConstraintForm);
+    byId('btnLoadConstraints').addEventListener('click', loadConstraints);
+
+    boot().catch(e=>setStatus('Boot failed: '+(e?.message||String(e))));
+  </script>
+</body>
+</html>

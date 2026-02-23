@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Dispatch Orbit - KPI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="app.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <div class="orb-bg"></div>
+  <header class="topbar shell">
+    <div>
+      <h1>Dispatch KPI</h1>
+      <p class="sub">Operational pulse in one screen</p>
+    </div>
+    <div class="top-actions">
+      <a class="btn ghost" href="index.html">Calendar</a>
+      <a class="btn" href="onsite.html">Onsite</a>
+      <button id="btnLogout" class="btn ghost" type="button" style="display:none">Sign out</button>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="card auth-card">
+      <form id="loginForm" class="auth-grid">
+        <input id="email" type="email" placeholder="Email" required />
+        <input id="password" type="password" placeholder="Password" required />
+        <button class="btn" type="submit">Sign in</button>
+      </form>
+      <div id="authStatus" class="muted">Not signed in</div>
+    </section>
+
+    <section class="kpi-grid" id="kpiGrid"></section>
+    <section class="card" id="kpiBreakdown"></section>
+  </main>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>
